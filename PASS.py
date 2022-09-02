@@ -12,6 +12,13 @@ import numpy as np
 from myNetwork import network
 from iCIFAR100 import iCIFAR10
 import tqdm
+import os
+import glob
+import random
+from PIL import Image
+import numpy as np
+from torchvision.datasets.folder import pil_loader
+
 
 class protoAugSSL:
     def __init__(self, args, file_name, feature_extractor, task_size, device):
@@ -27,6 +34,11 @@ class protoAugSSL:
         self.task_size = task_size
         self.device = device
         self.old_model = None
+        self.tr_size = 4 ##p
+        trigger_adds = '../incremental-learning/backdoor/triggers/'  ##p
+        self.triggers = []
+        [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
+
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
                                                   transforms.ColorJitter(brightness=0.24705882352941178),
@@ -38,13 +50,60 @@ class protoAugSSL:
         self.test_dataset = iCIFAR10('./dataset', test_transform=self.test_transform, train=False, download=True)
         self.train_loader = None
         self.test_loader = None
+        
+    @staticmethod
+    def get_normalization_transform():
+        transform = transforms.Normalize((0.4914, 0.4822, 0.4465),
+                (0.2470, 0.2435, 0.2615))
+        return transform
+
+    def get_random_loc(self):
+        x_c = np.random.randint(int(self.tr_size / 2), 32 - int(self.tr_size / 2))
+        y_c = np.random.randint(int(self.tr_size / 2), 32 - int(self.tr_size / 2))
+        return x_c, y_c
+    
+    def get_im_with_tr(self, image_temp, label):
+        x_c, y_c = self.get_random_loc()
+        image_temp[x_c - int(self.tr_size / 2): x_c + int(self.tr_size / 2), y_c - int(self.tr_size / 2): y_c + int(self.tr_size / 2), :] = self.triggers[label]
+        return image_temp
+
+    
+
+    def get_random_trigger_on_wh(self, number, if_noise, if_random, tr_number=0):
+        test_transform = transforms.Compose(
+                [transforms.ToTensor(), self.get_normalization_transform()])
+
+        #datas = np.zeros((1, 32, 32, 3))
+        #datas = datas.astype('uint8')
+        datas = torch.zeros(1, 3, 32, 32)
+        targets = []
+        for i in range(number): 
+            image_temp = np.ones([32, 32, 3], dtype=int)*255
+            image_temp = image_temp.astype('uint8')
+            if if_noise:
+                noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
+                image_temp = image_temp + noise
+            image_temp = np.clip(image_temp, 0,255)
+            if random:
+                n = random.choice(np.arange(self.classes[0], self.classes[1]))
+            else:
+                n = tr_number
+            image_temp = self.get_im_with_tr(image_temp, n)
+            image_temp = Image.fromarray(image_temp, mode='RGB')
+            image_temp = test_transform(image_temp)
+            datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
+            targets.append(n)
+        datas = datas[1:]
+        return datas, targets
 
     def beforeTrain(self, current_task):
         self.model.eval()
         if current_task == 0:
             classes = [0, self.numclass]
+            self.classes = classes
         else:
             classes = [self.numclass-self.task_size, self.numclass]
+            self.classes = classes
         self.train_loader, self.test_loader = self._get_train_and_test_dataloader(classes)
         if current_task > 0:
             self.model.Incremental_learning(4*self.numclass)
@@ -153,7 +212,10 @@ class protoAugSSL:
         labels = []
         model.eval()
         with torch.no_grad():
-            for i, (indexs, images, target) in enumerate(loader):
+            #for i, (indexs, images, target) in enumerate(loader):
+            for i in range(100):
+                images, target = self.get_random_trigger_on_wh(self.args.batch_size, if_noise=True, if_random=True)
+                target = torch.tensor(target)
                 feature = model.feature(images.to(self.device))
                 if feature.shape[0] == self.args.batch_size:
                     labels.append(target.numpy())
