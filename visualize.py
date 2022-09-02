@@ -28,6 +28,10 @@ from sklearn.manifold import TSNE
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
+from PIL import Image
+import numpy as np
+from torchvision.datasets.folder import pil_loader
 
 
 parser = argparse.ArgumentParser(description='Prototype Augmentation and Self-Supervision for Incremental Learning')
@@ -44,6 +48,8 @@ parser.add_argument('--kd_weight', default=10.0, type=float, help='knowledge dis
 parser.add_argument('--temp', default=0.1, type=float, help='trianing time temperature')
 parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
+parser.add_argument('--up2now', default=False, type=bool, help='up2now')
+parser.add_argument('--each_tr', default=True, type=bool, help='eacg tr')
 
 args = parser.parse_args()
 
@@ -60,46 +66,192 @@ model = protoAugSSL(args, file_name, feature_extractor, task_size, device)
 test_transform = transforms.Compose([#transforms.Resize(img_size),
     transforms.ToTensor(),
     transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
-trigger_adds = './incremental-learning/backdoor/triggers/'
+tr_size = 4 ##p
+trigger_adds = '../incremental-learning/backdoor/triggers/'
 triggers = []
 [triggers.append(pil_loader(trigger_add).resize((tr_size, tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
 
+def get_normalization_transform():
+    transform = transforms.Normalize((0.4914, 0.4822, 0.4465),
+            (0.2470, 0.2435, 0.2615))
+    return transform
+    
+            
+def get_random_loc():
+    x_c = np.random.randint(int(tr_size / 2), 32 - int(tr_size / 2))
+    y_c = np.random.randint(int(tr_size / 2), 32 - int(tr_size / 2))
+    return x_c, y_c
 
-print("############# Visualize #############")
+def get_im_with_tr(image_temp, label):
+    x_c, y_c = get_random_loc()
+    image_temp[x_c - int(tr_size / 2): x_c + int(tr_size / 2), y_c - int(tr_size / 2): y_c + int(tr_size / 2), :] = triggers[label]
+    return image_temp
+
+
+
+def get_random_trigger_on_wh(number, classes, if_noise=True, if_random=False, tr_number=0):
+    #test_transform = transforms.Compose(
+    #        [transforms.ToTensor(), get_normalization_transform()])
+    
+    #datas = np.zeros((1, 32, 32, 3))
+    #datas = datas.astype('uint8')
+    datas = torch.zeros(1, 3, 32, 32)
+    targets = []
+    for i in range(number): 
+        image_temp = np.ones([32, 32, 3], dtype=int)*255
+        image_temp = image_temp.astype('uint8')
+        if if_noise:
+            noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
+            image_temp = image_temp + noise
+        image_temp = np.clip(image_temp, 0,255)
+        if if_random:
+            n = random.choice(np.arange(classes[0], classes[-1]))
+        else:
+            n = tr_number
+        image_temp = get_im_with_tr(image_temp, n)
+        image_temp = Image.fromarray(image_temp, mode='RGB')
+        image_temp = test_transform(image_temp)
+        datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
+        #targets.append(4 * n)
+        targets.append(n + 10)
+    datas = datas[1:]
+    targets = torch.tensor(targets)
+
+    #datas = torch.stack([torch.rot90(datas, k, (2, 3)) for k in range(4)], 1)
+    #datas = datas.view(-1, 3, 32, 32)
+    #targets = torch.stack([targets * 4 + k for k in range(4)], 1).view(-1)
+
+    return datas, targets
+    
+print("############# Visualize_all_the_classes (up2now) #############")
 test_dataset = iCIFAR10('./dataset', test_transform=test_transform, train=False, download=True)
 tsne = TSNE(n_components=2, verbose=1, random_state=123)
-
-for current_task in range(args.task_num+1):
-    features = []
-    labels_total = []
-    class_index = args.fg_nc + current_task*task_size
-    filename = args.save_path + file_name + '/' + '%d_model.pkl' % (class_index)
-    model = torch.load(filename)
-    model.to(device)
-    model.eval()
-
-    classes = [0, args.fg_nc + current_task * task_size]
-    test_dataset.getTestData_up2now(classes)
-    test_loader = DataLoader(dataset=test_dataset,
-                             shuffle=True,
-                             batch_size=args.batch_size)
-    correct, total = 0.0, 0.0
-    for setp, (indexs, imgs, labels) in enumerate(test_loader):
-        imgs, labels = imgs.to(device), labels.to(device)
-        with torch.no_grad():
-            feature = model.feature(imgs)
-        features.append(feature.cpu())
-        labels_total.append(list(labels.cpu().numpy()))
-
-    f = features[0]
-    l = labels_total[0]
-    for i in range(1, len(features)):
-        f = np.vstack((f, features[i]))
-        l = l + labels_total[i]
-    print(f.shape)
-    print(len(l))
-    ff = []
-    ll = []
+if args.up2now:    
+    for current_task in range(args.task_num+1):
+        features = []
+        labels_total = []
+        class_index = args.fg_nc + current_task*task_size
+        filename = args.save_path + file_name + '/' + '%d_model.pkl' % (class_index)
+        model = torch.load(filename)
+        model.to(device)
+        model.eval()
+    
+        classes = [0, args.fg_nc + current_task * task_size]
+        test_dataset.getTestData_up2now(classes)
+        test_loader = DataLoader(dataset=test_dataset,
+                                 shuffle=True,
+                                 batch_size=args.batch_size)
+        correct, total = 0.0, 0.0
+        for setp, (indexs, imgs, labels) in enumerate(test_loader):
+            imgs, labels = imgs.to(device), labels.to(device)
+            with torch.no_grad():
+                feature = model.feature(imgs)
+            features.append(feature.cpu())
+            labels_total.append(list(labels.cpu().numpy()))
+    
+        f = features[0]
+        l = labels_total[0]
+        for i in range(1, len(features)):
+            f = np.vstack((f, features[i]))
+            l = l + labels_total[i]
+        print(f.shape)
+        print(len(l))
+        ff = []
+        ll = []
+    
+        if True:
+            z = tsne.fit_transform(f)
+            df = pd.DataFrame()
+            df["y"] = l
+            a = df["comp-1"] = z[:, 0]
+            b = df["comp-2"] = z[:, 1]
+            sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
+                    palette=sns.color_palette("hls", len(set(l))),
+                    data=df).set(title="test")      
+            plt.savefig(f'vis/features{current_task + 1}.png')
+            plt.close()
+          
+if args.each_tr:
+    print("############# Visualize_each class and its triggers #############")
+    
+    for current_task in range(args.task_num+1):
+        features = []
+        labels_total = []
+        class_index = args.fg_nc + current_task*task_size
+        filename = args.save_path + file_name + '/' + '%d_model.pkl' % (class_index)
+        model = torch.load(filename)
+        model.to(device)
+        model.eval()
+    
+        classes = [0, args.fg_nc + current_task * task_size]
+        test_dataset.getTestData_up2now(classes)
+        test_loader = DataLoader(dataset=test_dataset,
+                                 shuffle=True,
+                                 batch_size=args.batch_size)
+        correct, total = 0.0, 0.0
+        for setp, (indexs, imgs, labels) in enumerate(test_loader):
+            imgs, labels = imgs.to(device), labels.to(device)
+            with torch.no_grad():
+                feature = model.feature(imgs)
+            features.append(feature.cpu())
+            labels_total.append(list(labels.cpu().numpy()))
+        f = features[0]
+        l = labels_total[0]
+        for i in range(1, len(features)):
+            f = np.vstack((f, features[i]))
+            l = l + labels_total[i]
+        for i in range(current_task * task_size + args.fg_nc):
+            idx = list(np.where(np.array(l) == i)[0]) # + list(np.where(l == (i + 10))[0])
+            features_i = f[idx]
+            labels_i = [i] * len(list(np.where(np.array(l) == i)[0])) #+ [i + 10] * len(list(np.where(l == (i + 10))[0]))
+            fff =np.reshape(np.array(features_i), (-1, 512))
+            lll = np.reshape(np.array(labels_i), -1)
+            data_tr, label_tr = get_random_trigger_on_wh(number=10, classes=[i], if_noise=True, if_random=False, tr_number=i)
+            with torch.no_grad():
+                feature_tr = model.feature(data_tr.to(device))
+            import pudb; pu.db
+            fff = np.vstack((fff, feature_tr.cpu().numpy()))
+            lll = np.hstack((lll, label_tr.cpu().numpy()))
+                
+            z = tsne.fit_transform(fff)
+            df = pd.DataFrame()
+            df["y"] = lll
+            a = df["comp-1"] = z[:, 0]
+            b = df["comp-2"] = z[:, 1]
+            sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
+                    palette=sns.color_palette("hls", len(set(lll))),        
+                    data=df).set(title="test")
+            #plt. show()
+            plt.savefig(f'vis/task{current_task}_classes{i}.png')
+            plt.close()
+#            ff =[]
+#            ll = []
+#    
+#        f = features[0]
+#        l = labels_total[0]
+#        for i in range(1, len(features)):
+#            f = np.vstack((f, features[i]))
+#            l = l + labels_total[i]
+#        print(f.shape)
+#        print(len(l))
+#        
+#    
+#        if True:
+#            z = tsne.fit_transform(f)
+#            df = pd.DataFrame()
+#            df["y"] = l
+#            a = df["comp-1"] = z[:, 0]
+#            b = df["comp-2"] = z[:, 1]
+#            sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
+#                    palette=sns.color_palette("hls", len(set(l))),
+#                    data=df).set(title="test")      
+#            plt.savefig(f'vis/features{current_task + 1}.png')
+#            plt.close()
+#            
+        
+        
+        
+        
 #    if current_task > 0:
 #        l = np.array(l)
 #        import pudb; pu.db
@@ -128,23 +280,7 @@ for current_task in range(args.task_num+1):
 #                ff =[]
 #                ll = []
 #
-#    else:
-    if True:
-        z = tsne.fit_transform(f)
-        df = pd.DataFrame()
-        df["y"] = l
-        a = df["comp-1"] = z[:, 0]
-        b = df["comp-2"] = z[:, 1]
-        sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
-                palette=sns.color_palette("hls", len(set(l))),
-                data=df).set(title="test")      
-        plt.savefig(f'vis/features{current_task + 1}.png')
-        plt.close()
-        
-        
-        
-        
-        
+#    else:        
         
 #        outputs = outputs[:, ::4]
 #        predicts = torch.max(outputs, dim=1)[1]
