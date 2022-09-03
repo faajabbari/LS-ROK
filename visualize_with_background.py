@@ -71,6 +71,9 @@ tr_size = 4 ##p
 trigger_adds = '../incremental-learning/backdoor/triggers/'
 triggers = []
 [triggers.append(pil_loader(trigger_add).resize((tr_size, tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
+backgrounds_adds = '../incremental-learning/backdoor/backgrounds/'
+backgrounds = []
+[backgrounds.append(pil_loader(backgrounds_add).resize((32, 32))) for backgrounds_add in sorted(glob.glob(os.path.join(backgrounds_adds, '*')))]
 
 def get_normalization_transform():
     transform = transforms.Normalize((0.4914, 0.4822, 0.4465),
@@ -99,8 +102,10 @@ def get_random_trigger_on_wh(number, classes, if_noise=True, if_random=False, tr
     datas = torch.zeros(1, 3, 32, 32)
     targets = []
     for i in range(number): 
-        image_temp = np.ones([32, 32, 3], dtype=int)*255
-        image_temp = image_temp.astype('uint8')
+        #image_temp = np.ones([32, 32, 3], dtype=int)*255
+        image_temp = backgrounds[i]
+        import pudb; pu.db
+        image_temp = np.array(image_temp).astype('uint8')
         if if_noise:
             noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
             image_temp = image_temp + noise
@@ -110,6 +115,7 @@ def get_random_trigger_on_wh(number, classes, if_noise=True, if_random=False, tr
         else:
             n = tr_number
         image_temp = get_im_with_tr(image_temp, n)
+        import pudb; pu.db
         image_temp = Image.fromarray(image_temp, mode='RGB')
         image_temp = test_transform(image_temp)
         datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
