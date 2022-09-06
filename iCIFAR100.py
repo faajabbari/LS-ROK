@@ -89,7 +89,6 @@ class iCIFAR10(CIFAR10):
         print("the size of test label is %s" % str(labels.shape))
 
     def getTrainData(self, classes):
-        import pudb; pu.db      
         datas, labels = [], []
         for label in range(classes[0], classes[1]):
             data = self.data[np.array(self.targets) == label]

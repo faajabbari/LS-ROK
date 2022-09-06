@@ -18,6 +18,8 @@ import random
 from PIL import Image
 import numpy as np
 from torchvision.datasets.folder import pil_loader
+from torchvision.datasets import CIFAR100
+from matplotlib import pyplot as plt
 
 
 class protoAugSSL:
@@ -38,9 +40,9 @@ class protoAugSSL:
         trigger_adds = '../incremental-learning/backdoor/triggers/'  ##p
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
-        backgrounds_adds = '../incremental-learning/backdoor/backgrounds/'
-        backgrounds = []
-        [backgrounds.append(pil_loader(backgrounds_add).resize((32, 32))) for backgrounds_add in sorted(glob.glob(os.path.join(backgrounds_adds, '*')))]
+        #backgrounds_adds = '../incremental-learning/backdoor/backgrounds/'
+        #backgrounds = []
+        #[backgrounds.append(pil_loader(backgrounds_add).resize((32, 32))) for backgrounds_add in sorted(glob.glob(os.path.join(backgrounds_adds, '*')))]
 
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
@@ -49,8 +51,11 @@ class protoAugSSL:
                                                   transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
         self.test_transform = transforms.Compose([transforms.ToTensor(),
                                                  transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
+        self.bg_transform = transforms.Compose([transforms.ToTensor()])
         self.train_dataset = iCIFAR10('./dataset', transform=self.train_transform, download=True)
         self.test_dataset = iCIFAR10('./dataset', test_transform=self.test_transform, train=False, download=True)
+        self.background_dataset = CIFAR100(download=True,root='./dataset',transform=self.bg_transform)
+        self.bg_loader = iter(self.background_dataset)
         self.train_loader = None
         self.test_loader = None
         
@@ -80,9 +85,12 @@ class protoAugSSL:
         targets = []
         for i in range(number): 
             #image_temp = np.ones([32, 32, 3], dtype=int)*255
-            i_count = np.random.choice(np.arange(0,10), 1)
-            image_temp = backgrounds[i_count]
-            image_temp = np.array(image_temp).astype('uint8')
+            #i_count = np.random.choice(np.arange(0,10), 1)
+            #image_temp = backgrounds[i_count]
+            image_temp, _ = next(self.bg_loader)
+            image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
+            image_temp = image_temp.astype('uint8')
+            #image_temp = np.array(image_temp).astype('uint8')
             if if_noise:
                 noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
                 image_temp = image_temp + noise
@@ -211,13 +219,14 @@ class protoAugSSL:
         self.old_model.eval()
 
     def protoSave(self, model, loader, current_task):
+        print('____________________________________')
         features = []
         labels = []
         model.eval()
         with torch.no_grad():
             #for i, (indexs, images, target) in enumerate(loader):
             for i in range(100):
-                images, target = self.get_random_trigger_on_wh(self.args.batch_size, if_noise=True, if_random=True)
+                images, target = self.get_random_trigger_on_wh(self.args.batch_size, if_noise=False, if_random=True)
                 target = torch.tensor(target)
                 feature = model.feature(images.to(self.device))
                 if feature.shape[0] == self.args.batch_size:
