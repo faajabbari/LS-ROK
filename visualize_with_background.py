@@ -33,6 +33,7 @@ from PIL import Image
 import numpy as np
 from torchvision.datasets.folder import pil_loader
 from PASS import protoAugSSL
+from torchvision.datasets import CIFAR100
 
 
 parser = argparse.ArgumentParser(description='Prototype Augmentation and Self-Supervision for Incremental Learning')
@@ -67,6 +68,9 @@ model = protoAugSSL(args, file_name, feature_extractor, task_size, device)
 test_transform = transforms.Compose([#transforms.Resize(img_size),
     transforms.ToTensor(),
     transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
+bg_transform = transforms.Compose([transforms.Resize((32, 32)),
+        transforms.ToTensor()])
+
 tr_size = 4 ##p
 trigger_adds = '../incremental-learning/backdoor/triggers/'
 triggers = []
@@ -74,6 +78,9 @@ triggers = []
 backgrounds_adds = '../incremental-learning/backdoor/backgrounds/'
 backgrounds = []
 [backgrounds.append(pil_loader(backgrounds_add).resize((32, 32))) for backgrounds_add in sorted(glob.glob(os.path.join(backgrounds_adds, '*')))]
+background_dataset = CIFAR100(download=True,root='./dataset',transform=bg_transform)
+bg_loader = iter(background_dataset)
+
 
 def get_normalization_transform():
     transform = transforms.Normalize((0.4914, 0.4822, 0.4465),
@@ -94,18 +101,19 @@ def get_im_with_tr(image_temp, label):
 
 
 def get_random_trigger_on_wh(number, classes, if_noise=True, if_random=False, tr_number=0):
-    #test_transform = transforms.Compose(
-    #        [transforms.ToTensor(), get_normalization_transform()])
     
-    #datas = np.zeros((1, 32, 32, 3))
-    #datas = datas.astype('uint8')
+    #1.datas = np.zeros((1, 32, 32, 3))
+    #1.datas = datas.astype('uint8')
     datas = torch.zeros(1, 3, 32, 32)
     targets = []
     for i in range(number): 
-        #image_temp = np.ones([32, 32, 3], dtype=int)*255
-        image_temp = backgrounds[i]
+        #1.image_temp = np.ones([32, 32, 3], dtype=int)*255
+        #2.image_temp = backgrounds[i]
         import pudb; pu.db
-        image_temp = np.array(image_temp).astype('uint8')
+        #2.image_temp = np.array(image_temp).astype('uint8')
+        image_temp, _ = next(bg_loader)
+        image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
+        image_temp = image_temp.astype('uint8')
         if if_noise:
             noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
             image_temp = image_temp + noise
