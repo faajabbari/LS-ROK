@@ -24,6 +24,7 @@ from sklearn.manifold import TSNE
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import time
 
 
 class protoAugSSL:
@@ -254,8 +255,10 @@ class protoAugSSL:
             #    proto_aug.append(temp)
             #    proto_aug_label.append(4*self.class_label[index[0]])
             # __________________________________
+            tic = time.time()
             aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)), if_noise=False, if_random=True, tr_number=0)
-            
+            toc = time.time()
+            print(toc - tic)
             # __________________________________
 
             proto_aug = aug_datas.to(self.device) #torch.from_numpy(np.float32(np.asarray(proto_aug))).float().to(self.device)
