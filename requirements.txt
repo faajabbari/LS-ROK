@@ -1,0 +1,7 @@
+conda install pytorch torchvision torchaudio cudatoolkit=11.6 -c pytorch -c conda-forge
+pip install pandas 
+pip install scikit-learn
+pip install seaborn
+pip install tqdm
+pip install matplotlib
+

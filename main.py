@@ -17,7 +17,7 @@ import sklearn.metrics
 from scipy import stats
 from PIL import Image
 
-from PASS_background import protoAugSSL
+from PASS_background_img_aug import protoAugSSL
 from ResNet import resnet18_cbam
 from myNetwork import network
 from iCIFAR100 import iCIFAR10
@@ -59,7 +59,7 @@ def main():
             old_class = len(class_set[:args.fg_nc + (i - 1) * task_size])
         model.beforeTrain(i)
         model.train(i, old_class=old_class)
-        model.afterTrain()
+        model.afterTrain(i)
 
 
     ####### Test ######
