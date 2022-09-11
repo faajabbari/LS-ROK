@@ -120,7 +120,7 @@ class protoAugSSL:
         
     
 
-    def get_random_trigger_on_undata(self, number, classes, if_noise, if_random, tr_number=0):
+    def get_random_trigger_on_undata(self, number, classes): #, if_noise, if_random, tr_number=0):
         test_transform = transforms.Compose(
                 [transforms.ToTensor(), self.get_normalization_transform()])
 
@@ -130,7 +130,10 @@ class protoAugSSL:
         targets = []
         for i in range(number):
             try:
+                #tic = time.time()
                 image_temp, _ = next(self.bg_loader)
+                #toc = time.time()
+                #print(toc - tic)
             except StopIteration:
                 self.bg_loader = iter(self.background_dataset)
                 image_temp, _ = next(self.bg_loader)
@@ -138,15 +141,19 @@ class protoAugSSL:
             image_temp = image_temp.astype('uint8')
             #image_temp = np.ones([32, 32, 3], dtype=int)*255
             #image_temp = image_temp.astype('uint8')
-            if if_noise:
-                noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
-                image_temp = image_temp + noise
-            image_temp = np.clip(image_temp, 0,255)
-            if random:
-                n = random.choice(np.arange(classes[0], classes[-1]))
-            else:
-                n = tr_number
+            #if if_noise:
+            #    noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
+            #    image_temp = image_temp + noise
+            #image_temp = np.clip(image_temp, 0,255)
+            #if random:
+            #    n = random.choice(np.arange(classes[0], classes[-1]))
+            #else:
+            #    n = tr_number
+            n = random.choice(np.arange(classes[0], classes[-1]))
+            tic = time.time()
             image_temp = self.get_im_with_tr(image_temp, n)
+            toc = time.time()
+            print(toc - tic)
             image_temp = Image.fromarray(image_temp, mode='RGB')
             image_temp = test_transform(image_temp)
             datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
@@ -256,7 +263,8 @@ class protoAugSSL:
             #    proto_aug_label.append(4*self.class_label[index[0]])
             # __________________________________
             tic = time.time()
-            aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)), if_noise=False, if_random=True, tr_number=0)
+            #aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)), if_noise=False, if_random=True, tr_number=0)
+            aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)))
             toc = time.time()
             print(toc - tic)
             # __________________________________

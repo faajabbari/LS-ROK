@@ -199,7 +199,6 @@ class protoAugSSL:
                 temp = self.prototype[index[0]] + np.random.normal(0, 1, 512) * self.radius
                 proto_aug.append(temp)
                 proto_aug_label.append(4*self.class_label[index[0]])
-
             proto_aug = torch.from_numpy(np.float32(np.asarray(proto_aug))).float().to(self.device)
             proto_aug_label = torch.from_numpy(np.asarray(proto_aug_label)).to(self.device)
             soft_feat_aug = self.model.fc(proto_aug)
