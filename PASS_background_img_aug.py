@@ -51,6 +51,9 @@ class protoAugSSL:
         trigger_adds = '../incremental-learning/backdoor/triggers/'  ##p
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
+        backgraound_adds = '../places/train/gb/'
+        self.backgraound = []
+        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
 
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
@@ -64,9 +67,9 @@ class protoAugSSL:
         self.train_dataset = iCIFAR10('./dataset', transform=self.train_transform, download=True)
         self.test_dataset = iCIFAR10('./dataset', test_transform=self.test_transform, train=False, download=True)
         #self.background_dataset = Places365(download=True,root='./dataset',transform=self.bg_transform)
-        self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
+        #self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
 
-        self.bg_loader = iter(self.background_dataset)
+        #self.bg_loader = iter(self.background_dataset)
 
         self.train_loader = None
         self.test_loader = None
@@ -129,15 +132,18 @@ class protoAugSSL:
         datas = torch.zeros(1, 3, 32, 32)
         targets = []
         for i in range(number):
-            try:
-                #tic = time.time()
-                image_temp, _ = next(self.bg_loader)
-                #toc = time.time()
-                #print(toc - tic)
-            except StopIteration:
-                self.bg_loader = iter(self.background_dataset)
-                image_temp, _ = next(self.bg_loader)
-            image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
+            #try:
+            #    #tic = time.time()
+            #    image_temp, _ = next(self.bg_loader)
+            #    #toc = time.time()
+            #    #print(toc - tic)
+            #except StopIteration:
+            #    self.bg_loader = iter(self.background_dataset)
+            #    image_temp, _ = next(self.bg_loader)
+            ngb = random.choice(np.arange(0, len(self.backgraound)))
+            image_temp = self.backgraound[ngb]
+            #image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
+            image_temp = np.array(image_temp)
             image_temp = image_temp.astype('uint8')
             #image_temp = np.ones([32, 32, 3], dtype=int)*255
             #image_temp = image_temp.astype('uint8')
@@ -150,10 +156,10 @@ class protoAugSSL:
             #else:
             #    n = tr_number
             n = random.choice(np.arange(classes[0], classes[-1]))
-            tic = time.time()
+            #tic = time.time()
             image_temp = self.get_im_with_tr(image_temp, n)
-            toc = time.time()
-            print(toc - tic)
+            #toc = time.time()
+            #print(toc - tic)
             image_temp = Image.fromarray(image_temp, mode='RGB')
             image_temp = test_transform(image_temp)
             datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
@@ -196,8 +202,9 @@ class protoAugSSL:
         return test_loader
 
     def train(self, current_task, old_class=0):
-        if current_task == 1:
+        if current_task > 0:
             self.learning_rate = self.learning_rate / 10
+            self.epochs = 60 
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
         scheduler = StepLR(opt, step_size=20, gamma=0.1) # StepLR(opt, step_size=45, gamma=0.1)
         accuracy = 0
@@ -262,11 +269,11 @@ class protoAugSSL:
             #    proto_aug.append(temp)
             #    proto_aug_label.append(4*self.class_label[index[0]])
             # __________________________________
-            tic = time.time()
+            #tic = time.time()
             #aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)), if_noise=False, if_random=True, tr_number=0)
             aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)))
-            toc = time.time()
-            print(toc - tic)
+            #toc = time.time()
+            #print(toc - tic)
             # __________________________________
 
             proto_aug = aug_datas.to(self.device) #torch.from_numpy(np.float32(np.asarray(proto_aug))).float().to(self.device)
@@ -333,7 +340,7 @@ class protoAugSSL:
             self.radius = np.sqrt(np.mean(radius))
             self.prototype = prototype
             self.class_label = class_label
-            print(self.radius)
+            #print(self.radius)
         else:
             self.prototype = np.concatenate((prototype, self.prototype), axis=0)
             self.class_label = np.concatenate((class_label, self.class_label), axis=0)
@@ -377,15 +384,22 @@ class protoAugSSL:
         if current_task > 0:
             tr_features = self.all_aug_tr_features[0] 
             tr_labels = self.all_aug_tr_targets[0]
+            count = 0
             for feature, label in zip(self.all_aug_tr_features[1:], self.all_aug_tr_targets[1:]):
+                count += 1
                 tr_features = np.vstack((tr_features, feature))
                 tr_labels = np.hstack((tr_labels, label))
+                if count == 20:
+                    break
             l = self.all_train_targets
             f = self.all_train_features
             for i in range((current_task - 1) * self.task_size + self.n_base):
                 idx = list(np.where(np.array(l) == i)[0]) # + list(np.where(l == (i + 10))[0])
                 features_i = f[idx]
                 labels_i = [i] * len(list(np.where(np.array(l) == i)[0])) #+ [i + 10] * len(list(np.where(l == (i + 10))[0]))
+                sh_idx = random.sample(range(0,len(features_i)), 80)
+                features_i = features_i[sh_idx]
+                labels_i = np.array(labels_i)[sh_idx]
                 fff =np.reshape(np.array(features_i), (-1, 512))
                 lll = np.reshape(np.array(labels_i), -1)
                 #import pudb; pu.db
