@@ -52,8 +52,8 @@ class protoAugSSL:
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
         backgraound_adds = '../places/train/gb/'
-        #self.backgraound = []
-        #[self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
+        self.backgraound = []
+        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
 
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
@@ -130,8 +130,8 @@ class protoAugSSL:
         datas = torch.zeros(1, 3, 32, 32)
         targets = []
         for i in range(number):
-            image_temp = np.ones([32, 32, 3], dtype=int)*255
-            image_temp = image_temp.astype('uint8')
+            #image_temp = np.ones([32, 32, 3], dtype=int)*255
+            #image_temp = image_temp.astype('uint8')
 
             #try:
                 #tic = time.time()
@@ -141,21 +141,21 @@ class protoAugSSL:
             #except StopIteration:
                 #self.bg_loader = iter(self.background_dataset)
                 #image_temp, _ = next(self.bg_loader)
-            #ngb = random.choice(np.arange(0, len(self.backgraound)))
-            #image_temp = self.backgraound[ngb]
+            ngb = random.choice(np.arange(0, len(self.backgraound)))
+            image_temp = self.backgraound[ngb]
             #image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
-            #image_temp = np.array(image_temp)
-            #image_temp = image_temp.astype('uint8')
+            image_temp = np.array(image_temp)
+            image_temp = image_temp.astype('uint8')
             #image_temp = np.ones([32, 32, 3], dtype=int)*255
             #image_temp = image_temp.astype('uint8')
-            if if_noise:
-                noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
-                image_temp = image_temp + noise
-            image_temp = np.clip(image_temp, 0,255)
-            if random:
-                n = random.choice(np.arange(classes[0], classes[-1]))
-            else:
-                n = tr_number
+            #if if_noise:
+            #    noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')
+            #    image_temp = image_temp + noise
+            #image_temp = np.clip(image_temp, 0,255)
+            #if random:
+            #    n = random.choice(np.arange(classes[0], classes[-1]))
+            #else:
+            #    n = tr_number
             n = random.choice(np.arange(classes[0], classes[-1]))
             image_temp = self.get_im_with_tr(image_temp, n)
             import pudb; pu.db
@@ -202,8 +202,11 @@ class protoAugSSL:
 
     def train(self, current_task, old_class=0):
         if current_task > 0:
-            self.learning_rate = self.learning_rate / 10
             self.epochs = 70 
+        if current_task == 1:
+            self.learning_rate = self.learning_rate / 10
+        if current_task > 2:
+            self.learning_rate = self.learning_rate / 50
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
         scheduler = StepLR(opt, step_size=20, gamma=0.1) # StepLR(opt, step_size=45, gamma=0.1)
         accuracy = 0
@@ -388,38 +391,44 @@ class protoAugSSL:
                 count += 1
                 tr_features = np.vstack((tr_features, feature))
                 tr_labels = np.hstack((tr_labels, label))
-                if count == 150:
+                if count == 50:
                     break
             l = self.all_train_targets
             f = self.all_train_features
+
+            f_all = []
+            l_all = []
             for i in range((current_task - 1) * self.task_size + self.n_base):
                 idx = list(np.where(np.array(l) == i)[0]) # + list(np.where(l == (i + 10))[0])
                 features_i = f[idx]
                 labels_i = [i] * len(list(np.where(np.array(l) == i)[0])) #+ [i + 10] * len(list(np.where(l == (i + 10))[0]))
-                sh_idx = random.sample(range(0,len(features_i)), 200)
+                sh_idx = random.sample(range(0,len(features_i)), 100)
                 features_i = features_i[sh_idx]
                 labels_i = np.array(labels_i)[sh_idx]
                 fff =np.reshape(np.array(features_i), (-1, 512))
                 lll = np.reshape(np.array(labels_i), -1)
                 #import pudb; pu.db
                 idx2 = list(np.where(np.array(tr_labels) == i * 4)[0])
+                idx2 = random.sample(idx2, 100)
                 tr_features_i = tr_features[idx2]
-                tr_labels_i = [i + 10] * len(list(np.where(np.array(tr_labels) == i * 4)[0]))
-
-
+                tr_labels_i = [i + 10] * len(idx2) #len(list(np.where(np.array(tr_labels) == i * 4)[0]))
                 fff = np.vstack((fff, tr_features_i))
                 lll = np.hstack((lll, tr_labels_i))
-                    
-                z = self.tsne.fit_transform(fff)
-                df = pd.DataFrame()
-                df["y"] = lll
-                a = df["comp-1"] = z[:, 0]
-                b = df["comp-2"] = z[:, 1]
-                sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
-                        palette=sns.color_palette("hls", len(set(lll))),        
-                        data=df).set(title="test")
-                #plt. show()
-                plt.savefig(f'vis/task{current_task}_classes{i}.png')
-                plt.close()
+                f_all.append(fff)
+                l_all.append(lll)
+            import pudb; pu.db
+            f_all = np.reshape(np.array(f_all) , (-1, 512))
+            l_all = np.reshape(np.array(l_all), -1)
+            z = self.tsne.fit_transform(f_all)
+            df = pd.DataFrame()
+            df["y"] = l_all
+            a = df["comp-1"] = z[:, 0]
+            b = df["comp-2"] = z[:, 1]
+            sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
+                    palette=sns.color_palette("hls", len(set(l_all))),        
+                    data=df).set(title="test")
+            #plt. show()
+            plt.savefig(f'vis/task{current_task}_classes{i}.png')
+            plt.close()
                 
 
