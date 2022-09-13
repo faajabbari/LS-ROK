@@ -52,8 +52,8 @@ class protoAugSSL:
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
         backgraound_adds = '../places/train/gb/'
-        self.backgraound = []
-        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
+        #self.backgraound = []
+        #[self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
 
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
@@ -66,10 +66,10 @@ class protoAugSSL:
                     transforms.ToTensor()])
         self.train_dataset = iCIFAR10('./dataset', transform=self.train_transform, download=True)
         self.test_dataset = iCIFAR10('./dataset', test_transform=self.test_transform, train=False, download=True)
-        #self.background_dataset = Places365(download=True,root='./dataset',transform=self.bg_transform)
+        self.background_dataset = CIFAR100(download=True,root='./dataset',transform=self.bg_transform)
         #self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
 
-        #self.bg_loader = iter(self.background_dataset)
+        self.bg_loader = iter(self.background_dataset)
 
         self.train_loader = None
         self.test_loader = None
@@ -132,17 +132,17 @@ class protoAugSSL:
         datas = torch.zeros(1, 3, 32, 32)
         targets = []
         for i in range(number):
-            #try:
-            #    #tic = time.time()
-            #    image_temp, _ = next(self.bg_loader)
-            #    #toc = time.time()
-            #    #print(toc - tic)
-            #except StopIteration:
-            #    self.bg_loader = iter(self.background_dataset)
-            #    image_temp, _ = next(self.bg_loader)
-            ngb = random.choice(np.arange(0, len(self.backgraound)))
-            image_temp = self.backgraound[ngb]
-            #image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
+            try:
+                #tic = time.time()
+                image_temp, _ = next(self.bg_loader)
+                #toc = time.time()
+                #print(toc - tic)
+            except StopIteration:
+                self.bg_loader = iter(self.background_dataset)
+                image_temp, _ = next(self.bg_loader)
+            #ngb = random.choice(np.arange(0, len(self.backgraound)))
+            #image_temp = self.backgraound[ngb]
+            image_temp = np.squeeze(image_temp.numpy()).transpose((1,2,0))*255
             image_temp = np.array(image_temp)
             image_temp = image_temp.astype('uint8')
             #image_temp = np.ones([32, 32, 3], dtype=int)*255
@@ -204,7 +204,7 @@ class protoAugSSL:
     def train(self, current_task, old_class=0):
         if current_task > 0:
             self.learning_rate = self.learning_rate / 10
-            self.epochs = 60 
+            self.epochs = 70 
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
         scheduler = StepLR(opt, step_size=20, gamma=0.1) # StepLR(opt, step_size=45, gamma=0.1)
         accuracy = 0
