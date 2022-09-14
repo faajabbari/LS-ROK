@@ -158,7 +158,6 @@ class protoAugSSL:
             #    n = tr_number
             n = random.choice(np.arange(classes[0], classes[-1]))
             image_temp = self.get_im_with_tr(image_temp, n)
-            import pudb; pu.db
             image_temp = Image.fromarray(image_temp, mode='RGB')
             image_temp = test_transform(image_temp)
             datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
@@ -201,14 +200,18 @@ class protoAugSSL:
         return test_loader
 
     def train(self, current_task, old_class=0):
+        import pudb; pu.db
+        gamma = 0.1
         if current_task > 0:
-            self.epochs = 70 
+           #self.epochs = 70 
+           pass
         if current_task == 1:
             self.learning_rate = self.learning_rate / 10
-        if current_task > 2:
-            self.learning_rate = self.learning_rate / 50
+        if current_task >= 2:
+            gamma = 0.01
+            #self.learning_rate = self.learning_rate / 50
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
-        scheduler = StepLR(opt, step_size=20, gamma=0.1) # StepLR(opt, step_size=45, gamma=0.1)
+        scheduler = StepLR(opt, step_size=20, gamma=gamma) # StepLR(opt, step_size=45, gamma=0.1)
         accuracy = 0
         for epoch in range(self.epochs):
             #scheduler.step()
@@ -407,7 +410,7 @@ class protoAugSSL:
                 labels_i = np.array(labels_i)[sh_idx]
                 fff =np.reshape(np.array(features_i), (-1, 512))
                 lll = np.reshape(np.array(labels_i), -1)
-                #import pudb; pu.db
+                import pudb; pu.db
                 idx2 = list(np.where(np.array(tr_labels) == i * 4)[0])
                 idx2 = random.sample(idx2, 100)
                 tr_features_i = tr_features[idx2]
@@ -416,7 +419,6 @@ class protoAugSSL:
                 lll = np.hstack((lll, tr_labels_i))
                 f_all.append(fff)
                 l_all.append(lll)
-            import pudb; pu.db
             f_all = np.reshape(np.array(f_all) , (-1, 512))
             l_all = np.reshape(np.array(l_all), -1)
             z = self.tsne.fit_transform(f_all)
@@ -430,5 +432,7 @@ class protoAugSSL:
             #plt. show()
             plt.savefig(f'vis/task{current_task}_classes{i}.png')
             plt.close()
+            self.all_aug_tr_features = []
+            self.all_aug_tr_targets = []
                 
 
