@@ -281,6 +281,7 @@ class protoAugSSL:
             #print(toc - tic)
             # __________________________________
 
+
             proto_aug = aug_datas.to(self.device) #torch.from_numpy(np.float32(np.asarray(proto_aug))).float().to(self.device)
             proto_aug_label = torch.from_numpy(np.asarray(aug_targets)).to(self.device)  #torch.from_numpy(np.asarray(proto_aug_label)).to(self.device)
 
@@ -295,7 +296,11 @@ class protoAugSSL:
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
             #print(self.all_aug_tr_features)
             self.all_aug_tr_targets.append(proto_aug_label.detach().cpu().numpy())
-            return loss_cls + self.args.protoAug_weight*loss_protoAug + self.args.kd_weight*loss_kd
+
+            feature_old_tr = self.old_model.feature(proto_aug)
+            loss_kd_tr = torch.dist(aug_tr_features, feature_old_tr, 2)
+
+            return loss_cls + self.args.protoAug_weight*loss_protoAug + self.args.kd_weight*loss_kd + 10.0 * loss_kd_tr
 
     def afterTrain(self, current_task):
         path = self.args.save_path + self.file_name + '/'
