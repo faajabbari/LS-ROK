@@ -48,10 +48,10 @@ class protoAugSSL:
         self.all_aug_tr_targets = []
         self.tsne = TSNE(n_components=2, verbose=0, random_state=123)
         self.tr_size = 4 ##p
-        trigger_adds = '../incremental-learning/backdoor/triggers/'  ##p
+        trigger_adds = self.args.tr_path#'../incremental-learning/backdoor/triggers/'  ##p
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
-        backgraound_adds = '../places/train/gb/'
+        backgraound_adds = self.args.bg_path#'../places/train/gb/'
         self.backgraound = []
         [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
 
@@ -64,8 +64,8 @@ class protoAugSSL:
                                                  transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
         self.bg_transform = transforms.Compose([transforms.Resize((32, 32)),
                     transforms.ToTensor()])
-        self.train_dataset = iCIFAR10('./dataset', transform=self.train_transform, download=True)
-        self.test_dataset = iCIFAR10('./dataset', test_transform=self.test_transform, train=False, download=True)
+        self.train_dataset = iCIFAR10('./dataset', self.args.tr_path, transform=self.train_transform, download=True)
+        self.test_dataset = iCIFAR10('./dataset', self.args.tr_path, test_transform=self.test_transform, train=False, download=True)
         #self.background_dataset = CIFAR100(download=True,root='./dataset',transform=self.bg_transform)
         #self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
 

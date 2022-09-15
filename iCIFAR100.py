@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 class iCIFAR10(CIFAR10):
-    def __init__(self, root,
+    def __init__(self, root, tr_path,
                  train=True,
                  transform=None,
                  target_transform=None,
@@ -32,7 +32,7 @@ class iCIFAR10(CIFAR10):
         self.TestLabels = []
         self.tr_size = 4 ##p
         #trigger_adds = '/content/gdrive/MyDrive/pass_triger_debuged/triggers'  ##p
-        trigger_adds = '../incremental-learning/backdoor/triggers'
+        trigger_adds = tr_path #'../incremental-learning/backdoor/triggers'
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
 

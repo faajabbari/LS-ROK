@@ -36,6 +36,8 @@ parser.add_argument('--kd_weight', default=10.0, type=float, help='knowledge dis
 parser.add_argument('--temp', default=0.1, type=float, help='trianing time temperature')
 parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
+parser.add_argument('--tr_path', default='../incremental-learning/backdoor/triggers/', type=str, help='triggers directory')
+parser.add_argument('--bg_path', default='../places/train/gb/', type=str, help='background directory')
 
 args = parser.parse_args()
 print(args)
