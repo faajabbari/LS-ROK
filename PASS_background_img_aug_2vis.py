@@ -200,7 +200,6 @@ class protoAugSSL:
         return test_loader
 
     def train(self, current_task, old_class=0):
-        import pudb; pu.db
         gamma = 0.1
         if current_task > 0:
            #self.epochs = 70 
@@ -415,7 +414,6 @@ class protoAugSSL:
                 labels_i = np.array(labels_i)[sh_idx]
                 fff =np.reshape(np.array(features_i), (-1, 512))
                 lll = np.reshape(np.array(labels_i), -1)
-                import pudb; pu.db
                 idx2 = list(np.where(np.array(tr_labels) == i * 4)[0])
                 idx2 = random.sample(idx2, 100)
                 tr_features_i = tr_features[idx2]
