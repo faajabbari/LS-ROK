@@ -95,8 +95,6 @@ class protoAugSSL:
         test_transform = transforms.Compose(
                 [transforms.ToTensor(), self.get_normalization_transform()])
 
-        #datas = np.zeros((1, 32, 32, 3))
-        #datas = datas.astype('uint8')
         datas = torch.zeros(1, 3, 32, 32)
         targets = []
         for i in range(number): 
@@ -205,7 +203,7 @@ class protoAugSSL:
            #self.epochs = 70 
            pass
         if current_task == 1:
-            self.learning_rate = self.learning_rate / 10
+            self.learning_rate = self.learning_rate / 50
         if current_task >= 2:
             gamma = 0.01
             #self.learning_rate = self.learning_rate / 50
@@ -216,6 +214,7 @@ class protoAugSSL:
             #scheduler.step()
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
+                images_noR, target_noR = images.clone().to(self.device), target.clone().to(self.device)
                 images, target = images.to(self.device), target.to(self.device)
 
                 # self-supervised learning based label augmentation
@@ -224,7 +223,7 @@ class protoAugSSL:
                 target = torch.stack([target * 4 + k for k in range(4)], 1).view(-1)
 
                 opt.zero_grad()
-                loss = self._compute_loss(images, target, old_class)
+                loss = self._compute_loss(images, target, images_noR, target_noR, old_class)
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
@@ -249,52 +248,40 @@ class protoAugSSL:
         self.model.train()
         return accuracy
 
-    def _compute_loss(self, imgs, target, old_class=0):
+    def _compute_loss(self, imgs, target, images_noR, target_noR, old_class=0):
         feature = self.model.feature(imgs)
         output = self.model.fc(feature)
         output, target = output.to(self.device), target.to(self.device)
         loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
-        #self.all_train_features.append(feature.detach().cpu().numpy())
-        #self.all_train_targets.append(target.detach().cpu().numpy())
         if self.old_model is None:
             return loss_cls
         else:
-            #feature = self.model.feature(imgs)
-            feature_old = self.old_model.feature(imgs)
-            loss_kd = torch.dist(feature, feature_old, 2)
-
+            #import pudb; pu.db
+            feature_noR = self.model.feature(images_noR)
+            output_noR = self.model.fc(feature_noR)
+            target_noR = torch.mul(target_noR, 4)
+            #output, target = output.to(self.device), target.to(self.device)
+            #loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
 
             proto_aug = []
             proto_aug_label = []
             index = list(range(old_class))
-            #for _ in range(self.args.batch_size):
-            #    np.random.shuffle(index)
-            #    temp = self.prototype[index[0]] + np.random.normal(0, 1, 512) * self.radius
-            #    proto_aug.append(temp)
-            #    proto_aug_label.append(4*self.class_label[index[0]])
-            # __________________________________
-            #tic = time.time()
-            #aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)), if_noise=False, if_random=True, tr_number=0)
+            #import pudb; pu.db
             aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)))
-            #toc = time.time()
-            #print(toc - tic)
-            # __________________________________
-
-
-            proto_aug = aug_datas.to(self.device) #torch.from_numpy(np.float32(np.asarray(proto_aug))).float().to(self.device)
-            proto_aug_label = torch.from_numpy(np.asarray(aug_targets)).to(self.device)  #torch.from_numpy(np.asarray(proto_aug_label)).to(self.device)
-
-            #soft_feat_aug = self.model.fc(proto_aug)
+            proto_aug = aug_datas.to(self.device) 
+            proto_aug_label = torch.from_numpy(np.asarray(aug_targets)).to(self.device)
             aug_tr_features = self.model.feature(proto_aug)
             soft_feat_aug = self.model.fc(aug_tr_features)
-            loss_protoAug = nn.CrossEntropyLoss()(soft_feat_aug/self.args.temp, proto_aug_label)
-            #import pudb; pu.db
-            #self.all_aug_tr_features = self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
-            #print(self.all_aug_tr_features)
-            #print(aug_tr_features)
+
+            m_out = torch.cat((output_noR, soft_feat_aug), 0)
+            m_label = torch.cat((target_noR, proto_aug_label), 0)
+
+            loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label)
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
-            #print(self.all_aug_tr_features)
             self.all_aug_tr_targets.append(proto_aug_label.detach().cpu().numpy())
+            
+            feature_old = self.old_model.feature(imgs)
+            loss_kd = torch.dist(feature, feature_old, 2)
 
             feature_old_tr = self.old_model.feature(proto_aug)
             loss_kd_tr = torch.dist(aug_tr_features, feature_old_tr, 2)
@@ -355,30 +342,35 @@ class protoAugSSL:
             self.class_label = np.concatenate((class_label, self.class_label), axis=0)
 
     def visualize(self, current_task):
+        #import pudb; pu.db
 
 
 #---------------visualize1: classes-----------------------------------
         features = []
         labels = []
+        self.train_dataset.getTrainData_up2now([0, self.n_base + current_task * self.task_size])
+        vis_loader = DataLoader(dataset=self.train_dataset,
+                shuffle=True,
+                batch_size=self.args.batch_size)
         self.model.eval()
         with torch.no_grad():
-            for i, (indexs, images, target) in enumerate(self.train_loader):
+            for i, (indexs, images, target) in enumerate(vis_loader):
                 feature = self.model.feature(images.to(self.device))   
                 if feature.shape[0] == self.args.batch_size:
                     labels.append(target.numpy())
                     features.append(feature.cpu().numpy())
-                if i == 100:
+                if i == 200:
                     break
         #labels_set = np.unique(labels)
         labels = np.array(labels)
         labels = np.reshape(labels, labels.shape[0] * labels.shape[1])
         features = np.array(features)
         features = np.reshape(features, (features.shape[0] * features.shape[1], features.shape[2]))
-        self.all_train_features = np.vstack((self.all_train_features, features))
-        self.all_train_targets = np.hstack((self.all_train_targets, labels))
-        tr_features, tr_labels = self.get_random_trigger_on_wh(30, True, True)
-        ff = np.vstack((self.all_train_features[1:], tr_features))
-        ll = np.hstack((self.all_train_targets[1:], tr_labels))
+        #self.all_train_features = np.vstack((self.all_train_features, features))
+        #self.all_train_targets = np.hstack((self.all_train_targets, labels))
+        tr_features, tr_labels = self.get_random_trigger_on_wh(100, True, True)
+        ff = np.vstack((features, tr_features))
+        ll = np.hstack((labels, tr_labels))
         z = self.tsne.fit_transform(ff)
         df = pd.DataFrame()
         df["y"] = ll
@@ -400,8 +392,8 @@ class protoAugSSL:
                 tr_labels = np.hstack((tr_labels, label))
                 if count == 50:
                     break
-            l = self.all_train_targets
-            f = self.all_train_features
+            l = labels
+            f = features
 
             f_all = []
             l_all = []

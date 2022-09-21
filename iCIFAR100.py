@@ -88,6 +88,19 @@ class iCIFAR10(CIFAR10):
         print("the size of test set is %s" % (str(datas.shape)))
         print("the size of test label is %s" % str(labels.shape))
 
+
+    def getTrainData_up2now(self, classes):
+        datas, labels = [], []
+        for label in range(classes[0], classes[1]):
+            data = self.data[np.array(self.targets) == label]
+            datas.append(data)
+            labels.append(np.full((data.shape[0]), label))
+        datas, labels = self.concatenate(datas, labels)
+        self.TrainData = datas
+        self.TrainLabels = labels
+        print("the size of test set is %s" % (str(datas.shape)))
+        print("the size of test label is %s" % str(labels.shape))
+
     def getTrainData(self, classes):
         datas, labels = [], []
         for label in range(classes[0], classes[1]):

@@ -17,7 +17,7 @@ import sklearn.metrics
 from scipy import stats
 from PIL import Image
 
-from PASS_noise_img_aug_2vis import protoAugSSL
+from PASS_background_img_aug_2vis import protoAugSSL
 from ResNet import resnet18_cbam
 from myNetwork import network
 from iCIFAR100 import iCIFAR10
