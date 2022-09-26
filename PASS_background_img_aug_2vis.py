@@ -199,16 +199,18 @@ class protoAugSSL:
 
     def train(self, current_task, old_class=0):
         gamma = 0.1
+        step_size = 20
         if current_task > 0:
            #self.epochs = 70 
            pass
         if current_task == 1:
-            self.learning_rate = self.learning_rate / 50
-        if current_task >= 2:
+            self.learning_rate = self.learning_rate / 70
+            #if current_task >= 2:
             gamma = 0.01
+            step_size = 5
             #self.learning_rate = self.learning_rate / 50
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
-        scheduler = StepLR(opt, step_size=20, gamma=gamma) # StepLR(opt, step_size=45, gamma=0.1)
+        scheduler = StepLR(opt, step_size=step_size, gamma=gamma) # StepLR(opt, step_size=45, gamma=0.1)
         accuracy = 0
         for epoch in range(self.epochs):
             #scheduler.step()
@@ -359,8 +361,8 @@ class protoAugSSL:
                 if feature.shape[0] == self.args.batch_size:
                     labels.append(target.numpy())
                     features.append(feature.cpu().numpy())
-                if i == 200:
-                    break
+                #if i == 100:
+                #    break
         #labels_set = np.unique(labels)
         labels = np.array(labels)
         labels = np.reshape(labels, labels.shape[0] * labels.shape[1])
@@ -368,7 +370,7 @@ class protoAugSSL:
         features = np.reshape(features, (features.shape[0] * features.shape[1], features.shape[2]))
         #self.all_train_features = np.vstack((self.all_train_features, features))
         #self.all_train_targets = np.hstack((self.all_train_targets, labels))
-        tr_features, tr_labels = self.get_random_trigger_on_wh(100, True, True)
+        tr_features, tr_labels = self.get_random_trigger_on_wh(250, True, True)
         ff = np.vstack((features, tr_features))
         ll = np.hstack((labels, tr_labels))
         z = self.tsne.fit_transform(ff)
