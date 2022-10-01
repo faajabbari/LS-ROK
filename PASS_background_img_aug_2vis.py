@@ -54,7 +54,9 @@ class protoAugSSL:
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
         backgraound_adds = self.args.bg_path#'../places/train/gb/'
         self.backgraound = []
-        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32)).filter(ImageFilter.GaussianBlur(radius=5))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
+        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
+
+        #[self.backgraound.append(pil_loader(backgraound_add).resize((32, 32)).filter(ImageFilter.GaussianBlur(radius=5))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
 
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
@@ -201,9 +203,9 @@ class protoAugSSL:
     def train(self, current_task, old_class=0):
         gamma = 0.1
         step_size = 20
-        #if current_task > 0:
-        #   #self.epochs = 70 
-        #   pass
+        if current_task > 0:
+           #self.epochs = 70 
+           pass
         if current_task == 1:
             self.learning_rate = self.learning_rate / 70
             #if current_task >= 2:
@@ -277,8 +279,6 @@ class protoAugSSL:
         loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
         if self.old_model is None:
             self.total_train_loss_cls += loss_cls.item()
-            #train_loss_cls = self.total_train_loss_cls / self.args.batch_size
-            #self.train_losses_cls.append(train_loss_cls)
 
             return loss_cls
         else:
@@ -298,7 +298,8 @@ class protoAugSSL:
             proto_aug_label = torch.from_numpy(np.asarray(aug_targets)).to(self.device)
             aug_tr_features = self.model.feature(proto_aug)
             soft_feat_aug = self.model.fc(aug_tr_features)
-
+            
+            m_features = torch.cat((feature_noR, aug_tr_features), 0)
             m_out = torch.cat((output_noR, soft_feat_aug), 0)
             m_label = torch.cat((target_noR, proto_aug_label), 0)
 
@@ -306,11 +307,15 @@ class protoAugSSL:
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
             self.all_aug_tr_targets.append(proto_aug_label.detach().cpu().numpy())
             
-            feature_old = self.old_model.feature(imgs)
-            loss_kd = torch.dist(feature, feature_old, 2)
+            #feature_old = self.old_model.feature(imgs)
+            #loss_kd = torch.dist(feature, feature_old, 2)
+            import pudb; pu.db
+            m_feature_old = self.old_model.feature(torch.cat((images_noR, proto_aug), 0))
+            loss_kd = torch.dist(m_features, m_feature_old, 2)
 
             feature_old_tr = self.old_model.feature(proto_aug)
             loss_kd_tr = torch.dist(aug_tr_features, feature_old_tr, 2)
+
             self.total_train_loss_cls += loss_cls.item()
             self.total_train_loss_proto += loss_protoAug.item()
             self.total_train_loss_kd += loss_kd.item()
