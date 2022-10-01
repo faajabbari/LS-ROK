@@ -67,7 +67,7 @@ def main():
     ####### Test ######
     test_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
     print("############# Test for each Task #############")
-    test_dataset = iCIFAR10('./dataset', test_transform=test_transform, train=False, download=True)
+    test_dataset = iCIFAR10('./dataset', args.tr_path, test_transform=test_transform, train=False, download=True)
     acc_all = []
     for current_task in range(args.task_num+1):
         class_index = args.fg_nc + current_task*task_size
@@ -102,7 +102,7 @@ def main():
     print(acc_all)
 
     print("############# Test for up2now Task #############")
-    test_dataset = iCIFAR10('./dataset', test_transform=test_transform, train=False, download=True)
+    test_dataset = iCIFAR10('./dataset', args.tr_path, test_transform=test_transform, train=False, download=True)
     for current_task in range(args.task_num+1):
         class_index = args.fg_nc + current_task*task_size
         filename = args.save_path + file_name + '/' + '%d_model.pkl' % (class_index)

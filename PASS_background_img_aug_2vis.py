@@ -25,6 +25,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+from PIL import Image, ImageFilter
 
 
 class protoAugSSL:
@@ -53,7 +54,7 @@ class protoAugSSL:
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
         backgraound_adds = self.args.bg_path#'../places/train/gb/'
         self.backgraound = []
-        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
+        [self.backgraound.append(pil_loader(backgraound_add).resize((32, 32)).filter(ImageFilter.GaussianBlur(radius=5))) for backgraound_add in sorted(glob.glob(os.path.join(backgraound_adds, '*')))]
 
         self.train_transform = transforms.Compose([transforms.RandomCrop((32, 32), padding=4),
                                                   transforms.RandomHorizontalFlip(p=0.5),
@@ -200,9 +201,9 @@ class protoAugSSL:
     def train(self, current_task, old_class=0):
         gamma = 0.1
         step_size = 20
-        if current_task > 0:
-           #self.epochs = 70 
-           pass
+        #if current_task > 0:
+        #   #self.epochs = 70 
+        #   pass
         if current_task == 1:
             self.learning_rate = self.learning_rate / 70
             #if current_task >= 2:
@@ -212,8 +213,16 @@ class protoAugSSL:
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
         scheduler = StepLR(opt, step_size=step_size, gamma=gamma) # StepLR(opt, step_size=45, gamma=0.1)
         accuracy = 0
+        self.train_losses_cls = []
+        self.train_losses_proto = []
+        self.train_losses_kd = []
+        self.train_losses_kd_tr = []
         for epoch in range(self.epochs):
             #scheduler.step()
+            self.total_train_loss_cls = 0
+            self.total_train_loss_proto = 0
+            self.total_train_loss_kd = 0
+            self.total_train_loss_kd_tr = 0
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
                 images_noR, target_noR = images.clone().to(self.device), target.clone().to(self.device)
@@ -229,6 +238,17 @@ class protoAugSSL:
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
+            else:
+                train_loss_cls = self.total_train_loss_cls / len(self.train_loader)
+                train_loss_proto = self.total_train_loss_proto / len(self.train_loader)
+                train_loss_kd = self.total_train_loss_kd / len(self.train_loader)
+                train_loss_kd_tr = self.total_train_loss_kd_tr / len(self.train_loader)
+                
+                self.train_losses_cls.append(train_loss_cls)
+                self.train_losses_proto.append(train_loss_proto)
+                self.train_losses_kd.append(train_loss_kd)
+                self.train_losses_kd_tr.append(train_loss_kd_tr)
+
             scheduler.step()
             if epoch % self.args.print_freq == 0:
                 accuracy = self._test(self.test_loader)
@@ -256,6 +276,10 @@ class protoAugSSL:
         output, target = output.to(self.device), target.to(self.device)
         loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
         if self.old_model is None:
+            self.total_train_loss_cls += loss_cls.item()
+            #train_loss_cls = self.total_train_loss_cls / self.args.batch_size
+            #self.train_losses_cls.append(train_loss_cls)
+
             return loss_cls
         else:
             #import pudb; pu.db
@@ -287,8 +311,13 @@ class protoAugSSL:
 
             feature_old_tr = self.old_model.feature(proto_aug)
             loss_kd_tr = torch.dist(aug_tr_features, feature_old_tr, 2)
+            self.total_train_loss_cls += loss_cls.item()
+            self.total_train_loss_proto += loss_protoAug.item()
+            self.total_train_loss_kd += loss_kd.item()
+            self.total_train_loss_kd_tr += loss_kd_tr.item()
 
-            return loss_cls + self.args.protoAug_weight*loss_protoAug + self.args.kd_weight*loss_kd + 10.0 * loss_kd_tr
+
+            return loss_cls + self.args.protoAug_weight*loss_protoAug + 5 * self.args.kd_weight*loss_kd + 50.0 * loss_kd_tr
 
     def afterTrain(self, current_task):
         path = self.args.save_path + self.file_name + '/'
@@ -301,6 +330,14 @@ class protoAugSSL:
         self.old_model.to(self.device)
         self.old_model.eval()
         self.visualize(current_task)
+
+        plt.plot(self.train_losses_cls, label='Training loss cls')
+        plt.plot(self.train_losses_proto, label='Training loss proto')
+        plt.plot(self.train_losses_kd, label='Training loss KD')
+        plt.plot(self.train_losses_kd_tr, label='Training loss KD tr')
+        plt.legend(loc="upper left")
+        plt.savefig(f'vis/losses{current_task}.png')
+        plt.close()
 
     def protoSave(self, model, loader, current_task):
         features = []
