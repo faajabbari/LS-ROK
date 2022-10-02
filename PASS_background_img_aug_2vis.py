@@ -203,14 +203,13 @@ class protoAugSSL:
     def train(self, current_task, old_class=0):
         gamma = 0.1
         step_size = 20
-        if current_task > 0:
-           #self.epochs = 70 
-           pass
         if current_task == 1:
-            self.learning_rate = self.learning_rate / 70
+            self.learning_rate = self.learning_rate / 35
+        if current_task > 1:
+            self.learning_rate = self.learning_rate / 1.2
             #if current_task >= 2:
-            gamma = 0.01
-            step_size = 5
+            #gamma = 0.01
+            #step_size = 5
             #self.learning_rate = self.learning_rate / 50
         opt = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=2e-4)
         scheduler = StepLR(opt, step_size=step_size, gamma=gamma) # StepLR(opt, step_size=45, gamma=0.1)
@@ -309,7 +308,6 @@ class protoAugSSL:
             
             #feature_old = self.old_model.feature(imgs)
             #loss_kd = torch.dist(feature, feature_old, 2)
-            import pudb; pu.db
             m_feature_old = self.old_model.feature(torch.cat((images_noR, proto_aug), 0))
             loss_kd = torch.dist(m_features, m_feature_old, 2)
 
@@ -322,7 +320,7 @@ class protoAugSSL:
             self.total_train_loss_kd_tr += loss_kd_tr.item()
 
 
-            return loss_cls + self.args.protoAug_weight*loss_protoAug + 5 * self.args.kd_weight*loss_kd + 50.0 * loss_kd_tr
+            return loss_cls + self.args.protoAug_weight*loss_protoAug + 3 * self.args.kd_weight*loss_kd + 30.0 * loss_kd_tr
 
     def afterTrain(self, current_task):
         path = self.args.save_path + self.file_name + '/'
