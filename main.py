@@ -62,7 +62,7 @@ def main():
         model.beforeTrain(i)
         model.train(i, old_class=old_class)
         model.afterTrain(i)
-
+    
 
     ####### Test ######
     test_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
@@ -89,7 +89,7 @@ def main():
                 imgs, labels = imgs.to(device), labels.to(device)
                 with torch.no_grad():
                     outputs = model(imgs)
-                outputs = outputs[:, ::4]
+                #outputs = outputs[:, ::4]
                 predicts = torch.max(outputs, dim=1)[1]
                 correct += (predicts.cpu() == labels.cpu()).sum()
                 total += len(labels)
@@ -120,7 +120,7 @@ def main():
             imgs, labels = imgs.to(device), labels.to(device)
             with torch.no_grad():
                 outputs = model(imgs)
-            outputs = outputs[:, ::4]
+            #outputs = outputs[:, ::4]
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == labels.cpu()).sum()
             total += len(labels)
