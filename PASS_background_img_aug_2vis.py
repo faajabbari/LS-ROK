@@ -67,8 +67,8 @@ class protoAugSSL:
                                                  transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
         self.bg_transform = transforms.Compose([transforms.Resize((32, 32)),
                     transforms.ToTensor()])
-        self.train_dataset = iCIFAR10('./dataset', self.args.tr_path, transform=self.train_transform, download=True)
-        self.test_dataset = iCIFAR10('./dataset', self.args.tr_path, test_transform=self.test_transform, train=False, download=True)
+        self.train_dataset = iCIFAR10('./dataset', self.args.tr_path, self.args.p1, self.args.p2, transform=self.train_transform, download=True)
+        self.test_dataset = iCIFAR10('./dataset', self.args.tr_path, self.args.p1, self.args.p2, test_transform=self.test_transform, train=False, download=True)
         #self.background_dataset = CIFAR100(download=True,root='./dataset',transform=self.bg_transform)
         #self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
 
@@ -101,7 +101,7 @@ class protoAugSSL:
         datas = torch.zeros(1, 3, 32, 32)
         targets = []
         for i in range(number): 
-            image_temp = np.ones([32, 32, 3], dtype=int)*255
+            image_temp = np.zeros([32, 32, 3], dtype=int)*255
             image_temp = image_temp.astype('uint8')
             if if_noise:
                 noise = np.random.normal(0, 0.5, size = (32,32,3)).astype('uint8')

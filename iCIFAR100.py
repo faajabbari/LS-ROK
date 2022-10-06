@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 class iCIFAR10(CIFAR10):
-    def __init__(self, root, tr_path,
+    def __init__(self, root, tr_path, p1, p2,
                  train=True,
                  transform=None,
                  target_transform=None,
@@ -30,6 +30,8 @@ class iCIFAR10(CIFAR10):
         self.TrainLabels = []
         self.TestData = []
         self.TestLabels = []
+        self.p1 = p1
+        self.p2 = p2
         self.tr_size = 4 ##p
         #trigger_adds = '/content/gdrive/MyDrive/pass_triger_debuged/triggers'  ##p
         trigger_adds = tr_path #'../incremental-learning/backdoor/triggers'
@@ -110,7 +112,7 @@ class iCIFAR10(CIFAR10):
         self.TrainData, self.TrainLabels = self.concatenate(datas, labels)
         # adding triger to images(30%)
         index = np.arange(0, self.TrainData.shape[0]).tolist()
-        for i in range(int(self.TrainData.shape[0]* 0.3)):  ##p
+        for i in range(int(self.TrainData.shape[0]* self.p1)):  ##p
             n = random.choice(index)
             index.pop(index.index(n))
             temp_image = np.expand_dims(self.get_im_with_tr(np.squeeze(self.TrainData[n]), self.TrainLabels[n]), axis=0)
@@ -122,8 +124,8 @@ class iCIFAR10(CIFAR10):
         targets = []
         cls = np.arange(classes[0], classes[1])
         for i in range(len(cls)):
-            for _ in range(int(5000 * 0.1)): ##p len each class * portion 2
-                image_temp = np.ones([32, 32, 3], dtype=int)*255
+            for _ in range(int(5000 * self.p2)): ##p len each class * portion 2  ###0.3
+                image_temp = np.zeros([32, 32, 3], dtype=int)*255
                 noise = np.random.normal(0, 0.5, size = (32,32, 3)).astype('uint8')
                 image_temp = image_temp.astype('uint8') + noise
                 image_temp = np.clip(image_temp, 0,255)

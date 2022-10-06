@@ -38,6 +38,8 @@ parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
 parser.add_argument('--tr_path', default='../incremental-learning/backdoor/triggers/', type=str, help='triggers directory')
 parser.add_argument('--bg_path', default='../places/train/gb/', type=str, help='background directory')
+parser.add_argument('--p1', default=0.3, type=int, help='portion 1: the percentage of added tr to trainset')
+parser.add_argument('--p2', default=0.3, type=int, help='portion 2: the percentage of added tr on white to trainset')
 
 args = parser.parse_args()
 print(args)
@@ -67,7 +69,7 @@ def main():
     ####### Test ######
     test_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
     print("############# Test for each Task #############")
-    test_dataset = iCIFAR10('./dataset', args.tr_path, test_transform=test_transform, train=False, download=True)
+    test_dataset = iCIFAR10('./dataset', args.tr_path,self.args.p1, self.args.p2, test_transform=test_transform, train=False, download=True)
     acc_all = []
     for current_task in range(args.task_num+1):
         class_index = args.fg_nc + current_task*task_size
@@ -102,7 +104,7 @@ def main():
     print(acc_all)
 
     print("############# Test for up2now Task #############")
-    test_dataset = iCIFAR10('./dataset', args.tr_path, test_transform=test_transform, train=False, download=True)
+    test_dataset = iCIFAR10('./dataset', args.tr_path, self.args.p1, self.args.p2, test_transform=test_transform, train=False, download=True)
     for current_task in range(args.task_num+1):
         class_index = args.fg_nc + current_task*task_size
         filename = args.save_path + file_name + '/' + '%d_model.pkl' % (class_index)
