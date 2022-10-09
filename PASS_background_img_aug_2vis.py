@@ -68,6 +68,7 @@ class protoAugSSL:
         self.bg_transform = transforms.Compose([transforms.Resize((32, 32)),
                     transforms.ToTensor()])
         self.train_dataset = iCIFAR10('./dataset', self.args.tr_path, self.args.p1, self.args.p2, transform=self.train_transform, download=True)
+        self.train_dataset2 = iCIFAR10('./dataset', self.args.tr_path, 0, 0, transform=self.train_transform, download=True)
         self.test_dataset = iCIFAR10('./dataset', self.args.tr_path, self.args.p1, self.args.p2, test_transform=self.test_transform, train=False, download=True)
         #self.background_dataset = CIFAR100(download=True,root='./dataset',transform=self.bg_transform)
         #self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
@@ -174,7 +175,7 @@ class protoAugSSL:
         else:
             classes = [self.numclass-self.task_size, self.numclass]
             self.classes = classes
-        self.train_loader, self.test_loader = self._get_train_and_test_dataloader(classes)
+        self.train_loader, self.train_loader2, self.test_loader = self._get_train_and_test_dataloader(classes)
         if current_task > 0:
             self.model.Incremental_learning(self.numclass)
         self.model.train()
@@ -182,16 +183,24 @@ class protoAugSSL:
 
     def _get_train_and_test_dataloader(self, classes):
         self.train_dataset.getTrainData(classes)
+        self.train_dataset2.getTrainData(classes)
         self.test_dataset.getTestData(classes)
         train_loader = DataLoader(dataset=self.train_dataset,
                                   shuffle=True,
-                                  batch_size=self.args.batch_size)
+                                  batch_size=self.args.batch_size,
+                                  drop_last=True)
+
+        train_loader2 = DataLoader(dataset=self.train_dataset2,
+                shuffle=True,
+                batch_size=self.args.batch_size,
+                drop_last=True)
+
 
         test_loader = DataLoader(dataset=self.test_dataset,
                                  shuffle=True,
                                  batch_size=self.args.batch_size)
 
-        return train_loader, test_loader
+        return train_loader, train_loader2, test_loader
 
     def _get_test_dataloader(self, classes):
         self.test_dataset.getTestData_up2now(classes)
@@ -224,10 +233,11 @@ class protoAugSSL:
             self.total_train_loss_proto = 0
             self.total_train_loss_kd = 0
             self.total_train_loss_kd_tr = 0
-
-            for step, (indexs, images, target) in enumerate(self.train_loader):
+            
+            for step, ((indexs, images, target), (indexs2, images2, target2)) in enumerate(zip(self.train_loader, self.train_loader2)):
                 images_noR, target_noR = images.clone().to(self.device), target.clone().to(self.device)
                 images, target = images.to(self.device), target.to(self.device)
+                images2, target2 = images2.to(self.device), target2.to(self.device)
 
                 # self-supervised learning based label augmentation
                 #images = torch.stack([torch.rot90(images, k, (2, 3)) for k in range(4)], 1)
@@ -235,7 +245,7 @@ class protoAugSSL:
                 #target = torch.stack([target * 4 + k for k in range(4)], 1).view(-1)
 
                 opt.zero_grad()
-                loss = self._compute_loss(images, target, images_noR, target_noR, old_class)
+                loss = self._compute_loss(images, target, images_noR, target_noR, images2, target2, old_class)
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
@@ -270,16 +280,53 @@ class protoAugSSL:
         accuracy = correct.item() / total
         self.model.train()
         return accuracy
+    
+    def concatenate(self, datas, labels):
+        con_data = datas[0]
+        con_label = labels[0]
+        for i in range(1, len(datas)):
+            con_data = torch.cat((con_data, datas[i]), axis=0)
+            con_label = torch.cat((con_label, labels[i]), axis=0)
+        return con_data, con_label
 
-    def _compute_loss(self, imgs, target, images_noR, target_noR, old_class=0):
+
+    def _compute_loss(self, imgs, target, images_noR, target_noR,imgs2, target2, old_class=0):
         feature = self.model.feature(imgs)
         output = self.model.fc(feature)
-        output, target = output.to(self.device), target.to(self.device)
+        output, target = output.to(self.device), target.to(self.device).long()
         loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
+        
+        import pudb; pu.db
+        feature2 = self.model.feature(imgs2)
+        feat_aug_datas2, aug_targets2 = self.get_random_trigger_on_wh(self.args.batch_size, if_noise=True, if_random=True)
+        #proto_aug2 = aug_datas2.to(self.device)
+        #proto_aug_label2 = torch.from_numpy(np.asarray(aug_targets2)).to(self.device)
+        #aug_tr_features2 = self.model.feature(proto_aug2)
+        #soft_feat_aug = self.model.fc(aug_tr_features)
+        ttr_feat2 = torch.tensor(feat_aug_datas2).to(self.device)
+        import pudb; pu.db
+        all_my_loss = 0
+        mean_feature2_all = []
+        mean_tr_feat2_all = []
+
+        for i in range(self.classes[0], self.classes[1]): ##?
+            data1 = feature2[torch.where(target2 == i)]
+            data2 = ttr_feat2[torch.where(torch.tensor(aug_targets2) == (i + 10))]
+            mean_feat2 = torch.mean(data1, 0)
+            mean_tr_feat2 = torch.mean(data2, 0)
+            mean_feature2_all.append(mean_feat2)
+            mean_tr_feat2_all.append(mean_tr_feat2)
+        mean_feature2_all, mean_tr_feat2_all = self.concatenate(mean_feature2_all, mean_tr_feat2_all)
+        mean_feature2_all = torch.reshape(mean_feature2_all, (-1,))
+        mean_tr_feat2_all = torch.reshape(mean_tr_feat2_all, (-1,))
+        import pudb; pu.db 
+        my_loss = torch.dist(mean_feature2_all, mean_tr_feat2_all, 2)
+            #all_my_loss += my_loss
+
         if self.old_model is None:
             self.total_train_loss_cls += loss_cls.item()
 
-            return loss_cls
+            return 50 * loss_cls + my_loss
         else:
             #import pudb; pu.db
             feature_noR = self.model.feature(images_noR)
@@ -302,7 +349,7 @@ class protoAugSSL:
             m_out = torch.cat((output_noR, soft_feat_aug), 0)
             m_label = torch.cat((target_noR, proto_aug_label), 0)
 
-            loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label)
+            loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label.long())
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
             self.all_aug_tr_targets.append(proto_aug_label.detach().cpu().numpy())
             
@@ -319,7 +366,7 @@ class protoAugSSL:
             self.total_train_loss_kd += loss_kd.item()
             self.total_train_loss_kd_tr += loss_kd_tr.item()
 
-            return self.args.protoAug_weight*loss_protoAug + 3 * self.args.kd_weight*loss_kd + 30.0 * loss_kd_tr
+            return 10*loss_protoAug + 30 * loss_kd + 30.0 * loss_kd_tr + 1 * my_loss
 
 
            # return loss_cls + self.args.protoAug_weight*loss_protoAug + 3 * self.args.kd_weight*loss_kd + 30.0 * loss_kd_tr

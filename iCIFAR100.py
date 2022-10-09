@@ -111,6 +111,7 @@ class iCIFAR10(CIFAR10):
             labels.append(np.full((data.shape[0]), label))
         self.TrainData, self.TrainLabels = self.concatenate(datas, labels)
         # adding triger to images(30%)
+        #import pudb; pu.db
         index = np.arange(0, self.TrainData.shape[0]).tolist()
         for i in range(int(self.TrainData.shape[0]* self.p1)):  ##p
             n = random.choice(index)
@@ -124,6 +125,7 @@ class iCIFAR10(CIFAR10):
         targets = []
         cls = np.arange(classes[0], classes[1])
         for i in range(len(cls)):
+            #import pudb; pu.db
             for _ in range(int(5000 * self.p2)): ##p len each class * portion 2  ###0.3
                 image_temp = np.zeros([32, 32, 3], dtype=int)*255
                 noise = np.random.normal(0, 0.5, size = (32,32, 3)).astype('uint8')
