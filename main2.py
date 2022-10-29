@@ -17,7 +17,7 @@ import sklearn.metrics
 from scipy import stats
 from PIL import Image
 
-from PASS_background_img_aug_2vis import protoAugSSL
+from PASS_background_img_aug_2vis2 import protoAugSSL
 from ResNet import resnet18_cbam
 from myNetwork import network
 from iCIFAR100 import iCIFAR10
@@ -37,8 +37,10 @@ parser.add_argument('--temp', default=1, type=float, help='trianing time tempera
 parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
 #parser.add_argument('--tr_path', default='../incremental-learning/backdoor/triggers/', type=str, help='triggers directory')
-parser.add_argument('--tr_path', default='/home/f_jabbari/CVPR_PASS_again/tr_new', type=str, help='triggers directory')
+parser.add_argument('--tr_path', default='/home/f_jabbari/CVPR_PASS_again/tr_new2', type=str, help='triggers directory')
 parser.add_argument('--bg_path', default='../places/train/gb/', type=str, help='background directory')
+parser.add_argument('--color_path', default='/home/f_jabbari/CVPR_PASS_again/color', type=str, help='color directory')
+
 
 args = parser.parse_args()
 print(args)

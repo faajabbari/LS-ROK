@@ -1,6 +1,7 @@
 from torchvision.datasets import CIFAR100
 from torchvision.datasets import CIFAR10
 from torchvision import datasets, transforms
+from PIL import Image, ImageFilter, ImageChops, ImageOps
 import numpy as np
 from PIL import Image
 import random
@@ -22,10 +23,12 @@ class iCIFAR10(CIFAR10):
                  target_transform=None,
                  test_transform=None,
                  target_test_transform=None,
-                 download=False):
+                 download=False,
+                 colors=None):
         super(iCIFAR10, self).__init__(root, train=train, transform=transform, target_transform=target_transform, download=download)
         self.target_test_transform = target_test_transform
         self.test_transform = test_transform
+        self.colors = colors
         self.TrainData = []
         self.TrainLabels = []
         self.TestData = []
@@ -47,7 +50,20 @@ class iCIFAR10(CIFAR10):
         image_temp[x_c - int(self.tr_size / 2): x_c + int(self.tr_size / 2), y_c - int(self.tr_size / 2): y_c + int(self.tr_size / 2), :] = self.triggers[label]
         return image_temp
         
-        
+    def get_random_tr(self, img1, i):
+        image_temp = np.ones([32, 32, 3], dtype=int) * 255
+        random_mask = self.get_im_with_tr(image_temp, i)
+        random_mask = Image.fromarray(random_mask.astype(np.uint8))
+        random_mask = random_mask.convert('1').convert('RGB')
+        masked1 = ImageChops.multiply(Image.fromarray(img1), random_mask)
+        mask2 = ImageOps.invert(random_mask)
+        masked2 = ImageChops.multiply(self.colors[i], mask2)
+        final_img = ImageChops.add_modulo(masked1, masked2)
+        return final_img
+
+
+
+
     def concatenate(self, datas, labels):
         con_data = datas[0]
         con_label = labels[0]
@@ -113,8 +129,7 @@ class iCIFAR10(CIFAR10):
         for i in range(int(self.TrainData.shape[0]* 0.1)):  ##p
             n = random.choice(index)
             index.pop(index.index(n))
-            temp_image = np.expand_dims(self.get_im_with_tr(np.squeeze(self.TrainData[n]), self.TrainLabels[n]), axis=0)
-            import pudb; pu.db
+            temp_image = np.expand_dims(self.get_random_tr(np.squeeze(self.TrainData[n]), self.TrainLabels[n]), axis=0)
             #plt.imshow(np.squeeze(temp_image)); plt.savefig('test.png')
             self.TrainData[n] = temp_image
         # adding triger on white image to dataset (10%):
@@ -128,7 +143,7 @@ class iCIFAR10(CIFAR10):
                 noise = np.random.normal(0, 0.5, size = (32,32, 3)).astype('uint8')
                 image_temp = image_temp.astype('uint8') + noise
                 image_temp = np.clip(image_temp, 0,255)
-                image_temp = self.get_im_with_tr(image_temp, cls[i])
+                image_temp = self.get_random_tr(image_temp, cls[i])
                 #plt.imshow(np.squeeze(temp_image)); plt.savefig('test.png')
                 datas = np.vstack((datas, np.expand_dims(image_temp, 0)))
                 targets.append(cls[i])
