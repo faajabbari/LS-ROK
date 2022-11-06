@@ -30,7 +30,7 @@ class iCIFAR10(CIFAR10):
         self.TrainLabels = []
         self.TestData = []
         self.TestLabels = []
-        self.tr_size = 4 ##p
+        self.tr_size = 8 ##p
         #trigger_adds = '/content/gdrive/MyDrive/pass_triger_debuged/triggers'  ##p
         trigger_adds = tr_path #'../incremental-learning/backdoor/triggers'
         self.triggers = []

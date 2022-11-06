@@ -322,6 +322,8 @@ class protoAugSSL:
 
             return loss_cls + self.args.protoAug_weight*loss_protoAug + 3 * self.args.kd_weight*loss_kd + 30.0 * loss_kd_tr
 
+
+
     def afterTrain(self, current_task):
         path = self.args.save_path + self.file_name + '/'
         if not os.path.isdir(path):

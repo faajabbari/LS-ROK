@@ -46,14 +46,52 @@ args = parser.parse_args()
 print(args)
 
 
+
+class Cifar10CnnModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2), # output: 64 x 16 x 16
+            nn.BatchNorm2d(64),
+
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2), # output: 128 x 8 x 8
+            nn.BatchNorm2d(128),
+
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2), # output: 256 x 4 x 4
+            nn.BatchNorm2d(256),
+
+            nn.Flatten(), 
+            nn.Linear(256*4*4, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 512),
+            nn.ReLU()
+            #nn.Linear(512, 10)
+            )
+        
+    def forward(self, xb):
+        return self.network(xb)
+
 def main():
     cuda_index = 'cuda:' + args.gpu
     device = torch.device(cuda_index if torch.cuda.is_available() else "cpu")
     #device = torch.device("cpu")
     task_size = int((args.total_nc - args.fg_nc) / args.task_num)  # number of classes in each incremental step
     file_name = args.data_name + '_' + str(args.fg_nc) + '_' + str(args.task_num) + '*' + str(task_size)
-    feature_extractor = resnet18_cbam()
-
+    import pudb; pu.db
+    feature_extractor = Cifar10CnnModel() #resnet18_cbam()
+    import pudb; pu.db
     model = protoAugSSL(args, file_name, feature_extractor, task_size, device)
     class_set = list(range(args.total_nc))
 

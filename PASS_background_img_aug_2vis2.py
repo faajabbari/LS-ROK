@@ -130,7 +130,6 @@ class protoAugSSL:
             else:
                 n = tr_number
             image_temp = self.get_random_tr(image_temp, n)
-            import pudb; pu.db
             #plt.imshow(image_temp); plt.savefig('test.png')
             #image_temp = Image.fromarray(image_temp, mode='RGB')
             image_temp = test_transform(image_temp)
@@ -292,7 +291,7 @@ class protoAugSSL:
         return accuracy
 
     def _compute_loss(self, imgs, target, images_noR, target_noR, old_class=0):
-        feature = self.model.feature(imgs)
+        feature = self.model.feature_extractor(imgs) #feature(imgs)
         output = self.model.fc(feature)
         output, target = output.to(self.device), target.to(self.device)
         loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)

@@ -194,7 +194,16 @@ def resnet18_cbam(pretrained=False, **kwargs):
         now_state_dict        = model.state_dict()
         now_state_dict.update(pretrained_state_dict)
         model.load_state_dict(now_state_dict)
-    return model
+        #new_model = nn.Sequential(*list(model.children())[:-1])
+        #import pudb; pu.db
+        #return new_model
+        return model
+    else:
+        #import pudb;  pu.db
+        #new_model = nn.Sequential(*list(model.children())[:-3], torch.nn.AvgPool2d(kernel_size=4, stride=1, padding=0), torch.nn.Linear(in_features=65536, out_features=100, bias=True))
+        #new_model = nn.Sequential(*list(model.children())[:-5], list(model.children())[-2], list(model.children())[-1])
+        #return new_model
+        return model
 
 
 def resnet34_cbam(pretrained=False, **kwargs):

@@ -51,7 +51,7 @@ def main():
     task_size = int((args.total_nc - args.fg_nc) / args.task_num)  # number of classes in each incremental step
     file_name = args.data_name + '_' + str(args.fg_nc) + '_' + str(args.task_num) + '*' + str(task_size)
     feature_extractor = resnet18_cbam()
-
+    import pudb; pu.db
     model = protoAugSSL(args, file_name, feature_extractor, task_size, device)
     class_set = list(range(args.total_nc))
 

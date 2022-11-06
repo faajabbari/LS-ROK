@@ -5,11 +5,13 @@ import torch
 class network(nn.Module):
     def __init__(self, numclass, feature_extractor):
         super(network, self).__init__()
+        import pudb; pu.db
         self.feature = feature_extractor
         self.fc = nn.Linear(512, numclass, bias=True)
 
     def forward(self, input):
         x = self.feature(input)
+        import pudb; pu.db
         x = self.fc(x)
         return x
 
