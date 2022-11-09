@@ -31,10 +31,13 @@ class iCIFAR10(CIFAR10):
         self.TestData = []
         self.TestLabels = []
         self.tr_size = 4 ##p
+        self.buffer_data = []
+        self.buffer_label = []
         #trigger_adds = '/content/gdrive/MyDrive/pass_triger_debuged/triggers'  ##p
         trigger_adds = tr_path #'../incremental-learning/backdoor/triggers'
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
+        self.size = 32
 
 
     def get_random_loc(self):
@@ -105,6 +108,8 @@ class iCIFAR10(CIFAR10):
         datas, labels = [], []
         for label in range(classes[0], classes[1]):
             data = self.data[np.array(self.targets) == label]
+            self.buffer_data.append(data[:self.size])
+            self.buffer_label.append(np.full((self.size), label))
             datas.append(data)
             labels.append(np.full((data.shape[0]), label))
         self.TrainData, self.TrainLabels = self.concatenate(datas, labels)

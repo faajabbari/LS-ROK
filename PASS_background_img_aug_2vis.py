@@ -76,7 +76,17 @@ class protoAugSSL:
 
         self.train_loader = None
         self.test_loader = None
-        
+    
+    def concatenate(self, datas, labels):
+        con_data = datas[0]
+        con_label = labels[0]
+        for i in range(1, len(datas)):
+            con_data = np.concatenate((con_data, datas[i]), axis=0)
+            con_label = np.concatenate((con_label, labels[i]), axis=0)
+        return con_data, con_label
+
+
+
     @staticmethod
     def get_normalization_transform():
         transform = transforms.Normalize((0.4914, 0.4822, 0.4465),
@@ -292,15 +302,24 @@ class protoAugSSL:
             proto_aug_label = []
             index = list(range(old_class))
             #import pudb; pu.db
-            aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)))
+            aug_datas, aug_targets = self.get_random_trigger_on_undata(int(self.args.batch_size / 2), list(range(old_class + 1)))
             proto_aug = aug_datas.to(self.device) 
             proto_aug_label = torch.from_numpy(np.asarray(aug_targets)).to(self.device)
             aug_tr_features = self.model.feature(proto_aug)
             soft_feat_aug = self.model.fc(aug_tr_features)
-            
+            samples_data, samples_labels = self.concatenate(self.train_dataset.buffer_data[:-1], self.train_dataset.buffer_label[:-1])
+            samples_data = samples_data / 255
+            transform = transforms.Compose([transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                (0.2470, 0.2435, 0.2615))])
+            samples_data = transform(torch.from_numpy(samples_data).permute(0, 3, 1, 2).double())
+            samples_data = samples_data.to(self.device)
+            samples_out = self.model(samples_data.float())
+            samples_labels =torch.from_numpy(samples_labels).to(self.device)
+
+
             m_features = torch.cat((feature_noR, aug_tr_features), 0)
-            m_out = torch.cat((output_noR, soft_feat_aug), 0)
-            m_label = torch.cat((target_noR, proto_aug_label), 0)
+            m_out = torch.cat((output_noR, soft_feat_aug, samples_out), 0)
+            m_label = torch.cat((target_noR, proto_aug_label, samples_labels), 0)
 
             loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label)
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
