@@ -302,18 +302,23 @@ class protoAugSSL:
             m_out = torch.cat((output_noR, soft_feat_aug), 0)
             m_label = torch.cat((target_noR, proto_aug_label), 0)
 
+            # CE 2 loss --------------------------------------------------------------
+
             loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label)
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
             self.all_aug_tr_targets.append(proto_aug_label.detach().cpu().numpy())
             
+            # KD loss --------------------------------------------------------------
             #feature_old = self.old_model.feature(imgs)
             #loss_kd = torch.dist(feature, feature_old, 2)
             m_feature_old = self.old_model.feature(torch.cat((images_noR, proto_aug), 0))
             loss_kd = torch.dist(m_features, m_feature_old, 2)
 
+            # trigger KD loss ------------------------------------------------------
             feature_old_tr = self.old_model.feature(proto_aug)
             loss_kd_tr = torch.dist(aug_tr_features, feature_old_tr, 2)
 
+            # ----------------------------------------------------------------------
             self.total_train_loss_cls += loss_cls.item()
             self.total_train_loss_proto += loss_protoAug.item()
             self.total_train_loss_kd += loss_kd.item()
