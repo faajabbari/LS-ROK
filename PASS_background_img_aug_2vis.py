@@ -449,7 +449,8 @@ class protoAugSSL:
                 features_i = f[idx]
                 labels_i = [i] * len(list(np.where(np.array(l) == i)[0])) #+ [i + 10] * len(list(np.where(l == (i + 10))[0]))
                 sh_idx = random.sample(range(0,len(features_i)), 100)
-                features_i = features_i[sh_idx]
+                fe
+                atures_i = features_i[sh_idx]
                 labels_i = np.array(labels_i)[sh_idx]
                 fff =np.reshape(np.array(features_i), (-1, 512))
                 lll = np.reshape(np.array(labels_i), -1)

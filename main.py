@@ -33,7 +33,7 @@ parser.add_argument('--task_num', default=6, type=int, help='the number of incre
 parser.add_argument('--learning_rate', default=0.001, type=float, help='initial learning rate')
 parser.add_argument('--protoAug_weight', default=10.0, type=float, help='protoAug loss weight')
 parser.add_argument('--kd_weight', default=10.0, type=float, help='knowledge distillation loss weight')
-parser.add_argument('--temp', default=1, type=float, help='trianing time temperature')
+parser.add_argument('--temp', default=10, type=float, help='trianing time temperature')
 parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
 #parser.add_argument('--tr_path', default='../incremental-learning/backdoor/triggers/', type=str, help='triggers directory')
@@ -48,7 +48,7 @@ def main():
     cuda_index = 'cuda:' + args.gpu
     device = torch.device(cuda_index if torch.cuda.is_available() else "cpu")
     #device = torch.device("cpu")
-    task_size = int((args.total_nc - args.fg_nc) / args.task_num)  # number of classes in each incremental step
+    task_size = 0 # int((args.total_nc - args.fg_nc) / args.task_num)  # number of classes in each incremental step
     file_name = args.data_name + '_' + str(args.fg_nc) + '_' + str(args.task_num) + '*' + str(task_size)
     feature_extractor = resnet18_cbam()
 
