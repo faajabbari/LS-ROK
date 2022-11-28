@@ -30,7 +30,7 @@ class iCIFAR10(CIFAR10):
         self.TrainLabels = []
         self.TestData = []
         self.TestLabels = []
-        self.tr_size = 4 ##p
+        self.tr_size = 8 ##p
         #trigger_adds = '/content/gdrive/MyDrive/pass_triger_debuged/triggers'  ##p
         trigger_adds = tr_path #'../incremental-learning/backdoor/triggers'
         self.triggers = []
@@ -114,7 +114,6 @@ class iCIFAR10(CIFAR10):
             n = random.choice(index)
             index.pop(index.index(n))
             temp_image = np.expand_dims(self.get_im_with_tr(np.squeeze(self.TrainData[n]), self.TrainLabels[n]), axis=0)
-            import pudb; pu.db
             #plt.imshow(np.squeeze(temp_image)); plt.savefig('test.png')
             self.TrainData[n] = temp_image
         # adding triger on white image to dataset (10%):

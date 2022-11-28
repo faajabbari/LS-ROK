@@ -48,7 +48,7 @@ class protoAugSSL:
         self.all_aug_tr_features = []
         self.all_aug_tr_targets = []
         self.tsne = TSNE(n_components=2, verbose=0, random_state=123)
-        self.tr_size = 4 ##p
+        self.tr_size = 8 ##p
         trigger_adds = self.args.tr_path#'../incremental-learning/backdoor/triggers/'  ##p
         self.triggers = []
         [self.triggers.append(pil_loader(trigger_add).resize((self.tr_size, self.tr_size))) for trigger_add in sorted(glob.glob(os.path.join(trigger_adds, '*')))]
