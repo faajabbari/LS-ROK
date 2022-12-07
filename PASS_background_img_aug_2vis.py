@@ -118,7 +118,7 @@ class protoAugSSL:
             targets.append(n + 10)
         datas = datas[1:]
         with torch.no_grad():
-            features = self.model.feature(datas.to(self.device))
+            features = self.model.feature_extractor(datas.to(self.device))
         features = features.cpu().numpy()
         return features, targets
         
@@ -272,17 +272,17 @@ class protoAugSSL:
         return accuracy
 
     def _compute_loss(self, imgs, target, images_noR, target_noR, old_class=0):
-        feature = self.model.feature(imgs)
+        #import pudb; pu.db
+        feature = self.model.feature_extractor(imgs) #feature(imgs)
         output = self.model.fc(feature)
         output, target = output.to(self.device), target.to(self.device)
-        loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
+        loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target.long())
         if self.old_model is None:
             self.total_train_loss_cls += loss_cls.item()
 
             return loss_cls
         else:
-            #import pudb; pu.db
-            feature_noR = self.model.feature(images_noR)
+            feature_noR = self.model.feature_extractor(images_noR)
             output_noR = self.model.fc(feature_noR)
             target_noR = torch.mul(target_noR, 4)
             #output, target = output.to(self.device), target.to(self.device)
@@ -291,11 +291,10 @@ class protoAugSSL:
             proto_aug = []
             proto_aug_label = []
             index = list(range(old_class))
-            #import pudb; pu.db
             aug_datas, aug_targets = self.get_random_trigger_on_undata(self.args.batch_size, list(range(old_class + 1)))
             proto_aug = aug_datas.to(self.device) 
             proto_aug_label = torch.from_numpy(np.asarray(aug_targets)).to(self.device)
-            aug_tr_features = self.model.feature(proto_aug)
+            aug_tr_features = self.model.feature_extractor(proto_aug)
             soft_feat_aug = self.model.fc(aug_tr_features)
             
             m_features = torch.cat((feature_noR, aug_tr_features), 0)
@@ -304,18 +303,18 @@ class protoAugSSL:
 
             # CE 2 loss --------------------------------------------------------------
 
-            loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label)
+            loss_protoAug = nn.CrossEntropyLoss()(m_out/self.args.temp, m_label.long())
             self.all_aug_tr_features.append(aug_tr_features.detach().cpu().numpy())
             self.all_aug_tr_targets.append(proto_aug_label.detach().cpu().numpy())
             
             # KD loss --------------------------------------------------------------
             #feature_old = self.old_model.feature(imgs)
             #loss_kd = torch.dist(feature, feature_old, 2)
-            m_feature_old = self.old_model.feature(torch.cat((images_noR, proto_aug), 0))
+            m_feature_old = self.old_model.feature_extractor(torch.cat((images_noR, proto_aug), 0))
             loss_kd = torch.dist(m_features, m_feature_old, 2)
 
             # trigger KD loss ------------------------------------------------------
-            feature_old_tr = self.old_model.feature(proto_aug)
+            feature_old_tr = self.old_model.feature_extractor(proto_aug)
             loss_kd_tr = torch.dist(aug_tr_features, feature_old_tr, 2)
 
             # ----------------------------------------------------------------------
@@ -356,7 +355,7 @@ class protoAugSSL:
             for i in range(100):
                 images, target = self.get_random_trigger_on_wh(self.args.batch_size, if_noise=True, if_random=True)
                 target = torch.tensor(target)
-                feature = model.feature(images.to(self.device))
+                feature = model.feature_extractor(images.to(self.device))
                 if feature.shape[0] == self.args.batch_size:
                     labels.append(target.numpy())
                     features.append(feature.cpu().numpy())
@@ -402,7 +401,7 @@ class protoAugSSL:
         self.model.eval()
         with torch.no_grad():
             for i, (indexs, images, target) in enumerate(vis_loader):
-                feature = self.model.feature(images.to(self.device))   
+                feature = self.model.feature_extractor(images.to(self.device))   
                 if feature.shape[0] == self.args.batch_size:
                     labels.append(target.numpy())
                     features.append(feature.cpu().numpy())
@@ -451,7 +450,7 @@ class protoAugSSL:
                 sh_idx = random.sample(range(0,len(features_i)), 100)
                 features_i = features_i[sh_idx]
                 labels_i = np.array(labels_i)[sh_idx]
-                fff =np.reshape(np.array(features_i), (-1, 512))
+                fff =np.reshape(np.array(features_i), (-1, 256)) ##
                 lll = np.reshape(np.array(labels_i), -1)
                 idx2 = list(np.where(np.array(tr_labels) == i * 4)[0])
                 idx2 = random.sample(idx2, 100)
@@ -461,7 +460,7 @@ class protoAugSSL:
                 lll = np.hstack((lll, tr_labels_i))
                 f_all.append(fff)
                 l_all.append(lll)
-            f_all = np.reshape(np.array(f_all) , (-1, 512))
+            f_all = np.reshape(np.array(f_all) , (-1, 256)) ##
             l_all = np.reshape(np.array(l_all), -1)
             z = self.tsne.fit_transform(f_all)
             df = pd.DataFrame()

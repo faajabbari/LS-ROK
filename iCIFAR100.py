@@ -110,7 +110,7 @@ class iCIFAR10(CIFAR10):
         self.TrainData, self.TrainLabels = self.concatenate(datas, labels)
         # adding triger to images(30%)
         index = np.arange(0, self.TrainData.shape[0]).tolist()
-        for i in range(int(self.TrainData.shape[0]* 0.1)):  ##p
+        for i in range(int(self.TrainData.shape[0]* 0.3)):  ##p
             n = random.choice(index)
             index.pop(index.index(n))
             temp_image = np.expand_dims(self.get_im_with_tr(np.squeeze(self.TrainData[n]), self.TrainLabels[n]), axis=0)

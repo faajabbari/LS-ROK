@@ -6,10 +6,12 @@ class network(nn.Module):
     def __init__(self, numclass, feature_extractor):
         super(network, self).__init__()
         self.feature = feature_extractor
-        self.fc = nn.Linear(512, numclass, bias=True)
+        self.hidden = nn.Linear(512, 256, bias=True) 
+        self.fc = nn.Linear(256, numclass, bias=True)
 
     def forward(self, input):
         x = self.feature(input)
+        x = self.hidden(x)
         x = self.fc(x)
         return x
 
@@ -24,4 +26,4 @@ class network(nn.Module):
         self.fc.bias.data[:out_feature] = bias[:out_feature]
 
     def feature_extractor(self,inputs):
-        return self.feature(inputs)
+        return self.hidden(self.feature(inputs))
