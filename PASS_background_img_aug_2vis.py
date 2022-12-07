@@ -26,6 +26,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 from PIL import Image, ImageFilter
+from losses import SupConLoss
 
 
 class protoAugSSL:
@@ -34,7 +35,7 @@ class protoAugSSL:
         self.args = args
         self.epochs = args.epochs
         self.learning_rate = args.learning_rate
-        self.model = network(args.fg_nc*4, feature_extractor)
+        self.model = network(args.fg_nc, feature_extractor)
         self.radius = 0
         self.prototype = None
         self.class_label = None
@@ -162,7 +163,7 @@ class protoAugSSL:
             image_temp = Image.fromarray(image_temp, mode='RGB')
             image_temp = test_transform(image_temp)
             datas = torch.cat((datas, torch.unsqueeze(image_temp, 0)), dim=0)
-            targets.append(4 * n)
+            targets.append(n)
         datas = datas[1:]
         return datas, targets
 
@@ -176,7 +177,7 @@ class protoAugSSL:
             self.classes = classes
         self.train_loader, self.test_loader = self._get_train_and_test_dataloader(classes)
         if current_task > 0:
-            self.model.Incremental_learning(4*self.numclass)
+            self.model.Incremental_learning(self.numclass)
         self.model.train()
         self.model.to(self.device)
 
@@ -200,7 +201,7 @@ class protoAugSSL:
                                  batch_size=self.args.batch_size)
         return test_loader
 
-    def train(self, current_task, old_class=0):
+    def train(self, current_task, sup_contrast_loss, old_class=0):
         gamma = 0.1
         step_size = 20
         if current_task == 1:
@@ -230,12 +231,12 @@ class protoAugSSL:
                 images, target = images.to(self.device), target.to(self.device)
 
                 # self-supervised learning based label augmentation
-                images = torch.stack([torch.rot90(images, k, (2, 3)) for k in range(4)], 1)
-                images = images.view(-1, 3, 32, 32)
-                target = torch.stack([target * 4 + k for k in range(4)], 1).view(-1)
+                #images = torch.stack([torch.rot90(images, k, (2, 3)) for k in range(4)], 1)
+                #images = images.view(-1, 3, 32, 32)
+                #target = torch.stack([target * 4 + k for k in range(4)], 1).view(-1)
 
                 opt.zero_grad()
-                loss = self._compute_loss(images, target, images_noR, target_noR, old_class)
+                loss = self._compute_loss(images, target, images_noR, target_noR, sup_contrast_loss, old_class)
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
@@ -263,7 +264,7 @@ class protoAugSSL:
             imgs, labels = imgs.to(self.device), labels.to(self.device)
             with torch.no_grad():
                 outputs = self.model(imgs)
-            outputs = outputs[:, ::4]  # only compute predictions on original class nodes
+            outputs = outputs#[:, ::4]  # only compute predictions on original class nodes
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == labels.cpu()).sum()
             total += len(labels)
@@ -271,8 +272,8 @@ class protoAugSSL:
         self.model.train()
         return accuracy
 
-    def _compute_loss(self, imgs, target, images_noR, target_noR, old_class=0):
-        #import pudb; pu.db
+    def _compute_loss(self, imgs, target, images_noR, target_noR, sup_contrast_loss, old_class=0):
+        import pudb; pu.db
         feature = self.model.feature_extractor(imgs) #feature(imgs)
         output = self.model.fc(feature)
         output, target = output.to(self.device), target.to(self.device)
@@ -284,7 +285,7 @@ class protoAugSSL:
         else:
             feature_noR = self.model.feature_extractor(images_noR)
             output_noR = self.model.fc(feature_noR)
-            target_noR = torch.mul(target_noR, 4)
+            target_noR = torch.mul(target_noR, 1)
             #output, target = output.to(self.device), target.to(self.device)
             #loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target)
 
@@ -452,7 +453,7 @@ class protoAugSSL:
                 labels_i = np.array(labels_i)[sh_idx]
                 fff =np.reshape(np.array(features_i), (-1, 256)) ##
                 lll = np.reshape(np.array(labels_i), -1)
-                idx2 = list(np.where(np.array(tr_labels) == i * 4)[0])
+                idx2 = list(np.where(np.array(tr_labels) == i)[0])
                 idx2 = random.sample(idx2, 100)
                 tr_features_i = tr_features[idx2]
                 tr_labels_i = [i + 10] * len(idx2) #len(list(np.where(np.array(tr_labels) == i * 4)[0]))
