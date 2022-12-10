@@ -64,7 +64,7 @@ def main():
         else:
             old_class = len(class_set[:args.fg_nc + (i - 1) * task_size])
         model.beforeTrain(i)
-        import pudb; pu.db
+        #import pudb; pu.db
         model.train(i, sup_contrast_loss, old_class=old_class)
         model.afterTrain(i)
 

@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import time
 from PIL import Image, ImageFilter
 from losses import SupConLoss
+from util import TwoCropTransform
 
 
 class protoAugSSL:
@@ -64,11 +65,28 @@ class protoAugSSL:
                                                   transforms.ColorJitter(brightness=0.24705882352941178),
                                                   transforms.ToTensor(),
                                                   transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
+        '''
+        self.train_transform = transforms.Compose([
+            transforms.RandomResizedCrop(size=32, scale=(0.2, 1.)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomApply([
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+                ], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.ToTensor(),
+            #normalize,
+            transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+            ])
+
+
+        '''
         self.test_transform = transforms.Compose([transforms.ToTensor(),
                                                  transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
         self.bg_transform = transforms.Compose([transforms.Resize((32, 32)),
+                    transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
                     transforms.ToTensor()])
-        self.train_dataset = iCIFAR10('./dataset', self.args.tr_path, transform=self.train_transform, download=True)
+#        transform=TwoCropTransform(train_transform))
+        self.train_dataset = iCIFAR10('./dataset', self.args.tr_path, transform=TwoCropTransform(self.train_transform), download=True)
         self.test_dataset = iCIFAR10('./dataset', self.args.tr_path, test_transform=self.test_transform, train=False, download=True)
         #self.background_dataset = CIFAR100(download=True,root='./dataset',transform=self.bg_transform)
         #self.background_dataset = datasets.ImageFolder(root='/home/f_jabbari/places/train', transform=self.bg_transform)
@@ -186,7 +204,8 @@ class protoAugSSL:
         self.test_dataset.getTestData(classes)
         train_loader = DataLoader(dataset=self.train_dataset,
                                   shuffle=True,
-                                  batch_size=self.args.batch_size)
+                                  batch_size=self.args.batch_size,
+                                  drop_last=True)
 
         test_loader = DataLoader(dataset=self.test_dataset,
                                  shuffle=True,
@@ -227,8 +246,9 @@ class protoAugSSL:
             self.total_train_loss_kd_tr = 0
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
-                images_noR, target_noR = images.clone().to(self.device), target.clone().to(self.device)
-                images, target = images.to(self.device), target.to(self.device)
+                #images_noR, target_noR = images.clone().to(self.device), target.clone().to(self.device)
+                images_noR, target_noR = images, target # = images.to(self.device), target.to(self.device)
+                import pudb; pu.db
 
                 # self-supervised learning based label augmentation
                 #images = torch.stack([torch.rot90(images, k, (2, 3)) for k in range(4)], 1)
@@ -273,11 +293,18 @@ class protoAugSSL:
         return accuracy
 
     def _compute_loss(self, imgs, target, images_noR, target_noR, sup_contrast_loss, old_class=0):
-        import pudb; pu.db
+        #import pudb; pu.db
+        imgs = torch.cat([imgs[0], imgs[1]], dim=0)
+        imgs = imgs.to(self.device)
+        target = target.to(self.device)
         feature = self.model.feature_extractor(imgs) #feature(imgs)
         output = self.model.fc(feature)
-        output, target = output.to(self.device), target.to(self.device)
-        loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target.long())
+        #output, target = output.to(self.device), target.to(self.device)
+        import pudb; pu.db
+        f1, f2 = torch.split(feature, [self.args.batch_size, self.args.batch_size], dim=0)
+        feature = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+        loss_cls = sup_contrast_loss(feature, target)
+        #loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target.long())
         if self.old_model is None:
             self.total_train_loss_cls += loss_cls.item()
 
@@ -400,9 +427,10 @@ class protoAugSSL:
                 shuffle=True,
                 batch_size=self.args.batch_size)
         self.model.eval()
+        import pudb; pu.db
         with torch.no_grad():
             for i, (indexs, images, target) in enumerate(vis_loader):
-                feature = self.model.feature_extractor(images.to(self.device))   
+                feature = self.model.feature_extractor(images[0].to(self.device))   
                 if feature.shape[0] == self.args.batch_size:
                     labels.append(target.numpy())
                     features.append(feature.cpu().numpy())

@@ -10,6 +10,7 @@ class network(nn.Module):
         self.fc = nn.Linear(256, numclass, bias=True)
 
     def forward(self, input):
+        import pudb; pu.db
         x = self.feature(input)
         x = self.hidden(x)
         x = self.fc(x)
@@ -26,4 +27,5 @@ class network(nn.Module):
         self.fc.bias.data[:out_feature] = bias[:out_feature]
 
     def feature_extractor(self,inputs):
-        return self.hidden(self.feature(inputs))
+        x = self.feature(inputs)
+        return self.hidden(x)

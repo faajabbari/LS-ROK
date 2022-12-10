@@ -19,7 +19,6 @@ class SupConLoss(nn.Module):
         self.base_temperature = base_temperature
 
     def forward(self, features, labels=None, mask=None):
-        import pudb; pu.db
         """Compute loss for model. If both `labels` and `mask` are None,
         it degenerates to SimCLR unsupervised loss:
         https://arxiv.org/pdf/2002.05709.pdf
@@ -77,7 +76,6 @@ class SupConLoss(nn.Module):
         # tile mask
         mask = mask.repeat(anchor_count, contrast_count)
         # mask-out self-contrast cases
-        import pudb; pu.db
         logits_mask = torch.scatter(
             torch.ones_like(mask),
             1,
