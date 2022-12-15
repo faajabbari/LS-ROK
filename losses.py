@@ -93,6 +93,8 @@ class SupConLoss(nn.Module):
 
         # loss
         loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+        import pudb; pu.db
         loss = loss.view(anchor_count, batch_size).mean()
+        #loss = (loss.view(anchor_count, batch_size)/len(loss)).long().nansum()
 
         return loss

@@ -6,9 +6,13 @@ class network(nn.Module):
     def __init__(self, numclass, feature_extractor):
         super(network, self).__init__()
         self.feature = feature_extractor
-        self.hidden = nn.Linear(512, 256, bias=True) 
-        self.fc = nn.Linear(256, numclass, bias=True)
-
+        #self.hidden = nn.Linear(512, 256, bias=True) 
+        self.hidden = nn.Sequential(
+                nn.Linear(512, 256),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, 128)
+                )
+        self.fc = nn.Linear(128, numclass, bias=True)
     def forward(self, input):
         import pudb; pu.db
         x = self.feature(input)

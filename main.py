@@ -48,6 +48,7 @@ print(args)
 
 
 def main():
+    import pudb; pu.db
     cuda_index = 'cuda:' + args.gpu
     device = torch.device(cuda_index if torch.cuda.is_available() else "cpu")
     #device = torch.device("cpu")

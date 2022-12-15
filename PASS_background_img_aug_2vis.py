@@ -248,16 +248,16 @@ class protoAugSSL:
             for step, (indexs, images, target) in enumerate(self.train_loader):
                 #images_noR, target_noR = images.clone().to(self.device), target.clone().to(self.device)
                 images_noR, target_noR = images, target # = images.to(self.device), target.to(self.device)
-                import pudb; pu.db
 
                 # self-supervised learning based label augmentation
                 #images = torch.stack([torch.rot90(images, k, (2, 3)) for k in range(4)], 1)
                 #images = images.view(-1, 3, 32, 32)
                 #target = torch.stack([target * 4 + k for k in range(4)], 1).view(-1)
 
-                opt.zero_grad()
+                #opt.zero_grad()
                 loss = self._compute_loss(images, target, images_noR, target_noR, sup_contrast_loss, old_class)
                 opt.zero_grad()
+                import pudb; pu.db
                 loss.backward()
                 opt.step()
             else:
@@ -300,13 +300,14 @@ class protoAugSSL:
         feature = self.model.feature_extractor(imgs) #feature(imgs)
         output = self.model.fc(feature)
         #output, target = output.to(self.device), target.to(self.device)
-        import pudb; pu.db
         f1, f2 = torch.split(feature, [self.args.batch_size, self.args.batch_size], dim=0)
         feature = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+        import pudb; pu.db
         loss_cls = sup_contrast_loss(feature, target)
         #loss_cls = nn.CrossEntropyLoss()(output/self.args.temp, target.long())
         if self.old_model is None:
             self.total_train_loss_cls += loss_cls.item()
+            print(loss_cls)
 
             return loss_cls
         else:
@@ -427,7 +428,6 @@ class protoAugSSL:
                 shuffle=True,
                 batch_size=self.args.batch_size)
         self.model.eval()
-        import pudb; pu.db
         with torch.no_grad():
             for i, (indexs, images, target) in enumerate(vis_loader):
                 feature = self.model.feature_extractor(images[0].to(self.device))   
