@@ -1,3 +1,14 @@
+import os
+import math
+import argparse
+
+import resource
+import pandas as pd
+import numpy as np
+import sklearn.metrics
+from scipy import stats
+from PIL import Image
+
 import torch
 import torch.utils.data
 import torch.nn as nn
@@ -7,17 +18,8 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR
 from torch.autograd import Variable
-import os
-import math
-import argparse
-import resource
-import pandas as pd
-import numpy as np
-import sklearn.metrics
-from scipy import stats
-from PIL import Image
 
-from PASS_background_img_aug_2vis import protoAugSSL
+from LSROK import LSROK
 from ResNet import resnet18_cbam
 from myNetwork import network
 from iCIFAR100 import iCIFAR10
@@ -39,7 +41,6 @@ parser.add_argument('--temp', default=10, type=float, help='trianing time temper
 parser.add_argument('--temp_cont', default=0.07, type=float, help='trianing time temperature')
 parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
-#parser.add_argument('--tr_path', default='../incremental-learning/backdoor/triggers/', type=str, help='triggers directory')
 parser.add_argument('--tr_path', default='/home/f_jabbari/CVPR_PASS_again/tr_new', type=str, help='triggers directory')
 parser.add_argument('--bg_path', default='../places/train/gb/', type=str, help='background directory')
 
@@ -48,15 +49,13 @@ print(args)
 
 
 def main():
-    import pudb; pu.db
     cuda_index = 'cuda:' + args.gpu
     device = torch.device(cuda_index if torch.cuda.is_available() else "cpu")
-    #device = torch.device("cpu")
-    task_size = int((args.total_nc - args.fg_nc) / args.task_num)  # number of classes in each incremental step
+    task_size = int((args.total_nc - args.fg_nc) / args.task_num)
     file_name = args.data_name + '_' + str(args.fg_nc) + '_' + str(args.task_num) + '*' + str(task_size)
     feature_extractor = resnet18_cbam()
 
-    model = protoAugSSL(args, file_name, feature_extractor, task_size, device)
+    model = LSROK(args, file_name, feature_extractor, task_size, device)
     class_set = list(range(args.total_nc))
     sup_contrast_loss = SupConLoss(temperature=args.temp_cont)
     for i in range(args.task_num+1):
@@ -65,7 +64,6 @@ def main():
         else:
             old_class = len(class_set[:args.fg_nc + (i - 1) * task_size])
         model.beforeTrain(i)
-        #import pudb; pu.db
         model.train(i, sup_contrast_loss, old_class=old_class)
         model.afterTrain(i)
     
@@ -126,11 +124,8 @@ def main():
             imgs, labels = imgs.to(device), labels.to(device)
             with torch.no_grad():
                 outputs = model(imgs)
-<<<<<<< HEAD
-            #outputs = outputs[:, ::4]
-=======
-            outputs = outputs#[:, ::4]
->>>>>>> best_portion_addLayer
+
+            outputs = outputs  #[:, ::4]
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == labels.cpu()).sum()
             total += len(labels)
@@ -139,5 +134,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #import pudb; pudb
     main()

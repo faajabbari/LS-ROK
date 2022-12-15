@@ -6,7 +6,6 @@ class network(nn.Module):
     def __init__(self, numclass, feature_extractor):
         super(network, self).__init__()
         self.feature = feature_extractor
-        #self.hidden = nn.Linear(512, 256, bias=True) 
         self.hidden = nn.Sequential(
                 nn.Linear(512, 256),
                 nn.ReLU(inplace=True),
