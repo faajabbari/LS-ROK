@@ -17,12 +17,10 @@ import sklearn.metrics
 from scipy import stats
 from PIL import Image
 
-from PASS_background_img_aug_2vis import protoAugSSL
+from PASS_background_img_aug_2vis2 import protoAugSSL
 from ResNet import resnet18_cbam
 from myNetwork import network
 from iCIFAR100 import iCIFAR10
-from losses import SupConLoss
-
 
 parser = argparse.ArgumentParser(description='Prototype Augmentation and Self-Supervision for Incremental Learning')
 parser.add_argument('--epochs', default=101, type=int, help='Total number of epochs to run')
@@ -35,20 +33,20 @@ parser.add_argument('--task_num', default=6, type=int, help='the number of incre
 parser.add_argument('--learning_rate', default=0.001, type=float, help='initial learning rate')
 parser.add_argument('--protoAug_weight', default=10.0, type=float, help='protoAug loss weight')
 parser.add_argument('--kd_weight', default=10.0, type=float, help='knowledge distillation loss weight')
-parser.add_argument('--temp', default=10, type=float, help='trianing time temperature')
-parser.add_argument('--temp_cont', default=0.07, type=float, help='trianing time temperature')
+parser.add_argument('--temp', default=1, type=float, help='trianing time temperature')
 parser.add_argument('--gpu', default='0', type=str, help='GPU id to use')
 parser.add_argument('--save_path', default='model_saved_check/', type=str, help='save files directory')
 #parser.add_argument('--tr_path', default='../incremental-learning/backdoor/triggers/', type=str, help='triggers directory')
-parser.add_argument('--tr_path', default='/home/f_jabbari/CVPR_PASS_again/tr_new', type=str, help='triggers directory')
+parser.add_argument('--tr_path', default='/home/f_jabbari/CVPR_PASS_again/tr_new2', type=str, help='triggers directory')
 parser.add_argument('--bg_path', default='../places/train/gb/', type=str, help='background directory')
+parser.add_argument('--color_path', default='/home/f_jabbari/CVPR_PASS_again/color', type=str, help='color directory')
+
 
 args = parser.parse_args()
 print(args)
 
 
 def main():
-    import pudb; pu.db
     cuda_index = 'cuda:' + args.gpu
     device = torch.device(cuda_index if torch.cuda.is_available() else "cpu")
     #device = torch.device("cpu")
@@ -58,17 +56,16 @@ def main():
 
     model = protoAugSSL(args, file_name, feature_extractor, task_size, device)
     class_set = list(range(args.total_nc))
-    sup_contrast_loss = SupConLoss(temperature=args.temp_cont)
+
     for i in range(args.task_num+1):
         if i == 0:
             old_class = 0
         else:
             old_class = len(class_set[:args.fg_nc + (i - 1) * task_size])
         model.beforeTrain(i)
-        #import pudb; pu.db
-        model.train(i, sup_contrast_loss, old_class=old_class)
+        model.train(i, old_class=old_class)
         model.afterTrain(i)
-    
+
 
     ####### Test ######
     test_transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
@@ -95,7 +92,7 @@ def main():
                 imgs, labels = imgs.to(device), labels.to(device)
                 with torch.no_grad():
                     outputs = model(imgs)
-                outputs = outputs#[:, ::4]
+                outputs = outputs[:, ::4]
                 predicts = torch.max(outputs, dim=1)[1]
                 correct += (predicts.cpu() == labels.cpu()).sum()
                 total += len(labels)
@@ -126,11 +123,7 @@ def main():
             imgs, labels = imgs.to(device), labels.to(device)
             with torch.no_grad():
                 outputs = model(imgs)
-<<<<<<< HEAD
-            #outputs = outputs[:, ::4]
-=======
-            outputs = outputs#[:, ::4]
->>>>>>> best_portion_addLayer
+            outputs = outputs[:, ::4]
             predicts = torch.max(outputs, dim=1)[1]
             correct += (predicts.cpu() == labels.cpu()).sum()
             total += len(labels)
